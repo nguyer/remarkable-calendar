@@ -2,30 +2,36 @@
 
 _A native Google Calendar app for your reMarkable tablet._
 
+| Week View                                                    | Day View                                                    |
+| ------------------------------------------------------------ | ----------------------------------------------------------- |
+| ![Week View](docs/images/screenshot_2026-10-27_21-17-57.png) | ![Day View](docs/images/screenshot_2026-10-27_21-18-11.png) |
+
 See your week, browse a day's schedule, and create or edit events on your tablet. Sync over Wi-Fi, then keep using your saved calendar offline. Offline changes are sent to Google the next time you sync.
 
-The app appears as **Calendar** in AppLoad. It was developed for **reMarkable Paper Pro Move**. Full-size Paper Pro support is being evaluated; the current package still uses the Move layout. reMarkable 1 and 2 are not supported by these build instructions.
+The app appears as **Calendar** in AppLoad. It was designed for **reMarkable Paper Pro Move**, however it also runs and works well on the full size Paper Pro.
 
 ## Features
 
-| Status | Feature | Description |
-| :---: | --- | --- |
-| ☑ | Weekly overview | Seven days with morning/afternoon columns and a today indicator. |
-| ☑ | Day schedule | Hourly timeline with a separate all-day events area. |
-| ☑ | Swipe navigation | Swipe between weeks or days, or use the arrows and Today button. |
-| ☑ | Event details | Read times, location, description, and calendar information. |
-| ☑ | Multiple Google calendars | Select calendars and display their Google Calendar colors. |
-| ☑ | Offline access | View cached events and queue changes while disconnected. |
-| ☑ | Create, edit, and delete | Manage events using an on-screen keyboard. |
-| ☑ | Pending changes | Review queued changes and errors in Settings. |
-| ☑ | Local events | Keep events on the tablet without syncing them to Google. |
-| ☑ | Recurring events | View recurring events and edit or delete an individual occurrence. |
-| ☑ | All-day and multi-day events | Display events across full days or multiple dates. |
-| ☑ | Display preferences | Choose 12/24-hour time and fixed or scrolling day schedules. |
-| ☑ | Offline date window | Choose how many months to keep on the tablet. |
-| ☑ | Background sync | Sync manually or refresh stale data when launching the app. |
-| ☐ | Month overview | Planned. |
-| ☐ | Year overview | Planned. |
+| Status | Feature                      | Description                                                        |
+| :----: | ---------------------------- | ------------------------------------------------------------------ |
+|   ☑    | Weekly overview              | Seven days with morning/afternoon columns and a today indicator.   |
+|   ☑    | Day schedule                 | Hourly timeline with a separate all-day events area.               |
+|   ☑    | Swipe navigation             | Swipe between weeks or days, or use the arrows and Today button.   |
+|   ☑    | Event details                | Read times, location, description, and calendar information.       |
+|   ☑    | Multiple Google calendars    | Select calendars and display their Google Calendar colors.         |
+|   ☑    | Offline access               | View cached events and queue changes while disconnected.           |
+|   ☑    | Create, edit, and delete     | Manage events using an on-screen keyboard.                         |
+|   ☑    | Pending changes              | Review queued changes and errors in Settings.                      |
+|   ☑    | Local events                 | Keep events on the tablet without syncing them to Google.          |
+|   ☑    | Recurring events             | View recurring events and edit or delete an individual occurrence. |
+|   ☑    | All-day and multi-day events | Display events across full days or multiple dates.                 |
+|   ☑    | Display preferences          | Choose 12/24-hour time and fixed or scrolling day schedules.       |
+|   ☑    | Offline date window          | Choose how many months to keep on the tablet.                      |
+|   ☑    | Background sync              | Sync manually or refresh stale data when launching the app.        |
+|   ☐    | Month overview               | Planned.                                                           |
+|   ☐    | Year overview                | Planned.                                                           |
+|   ☐    | Vellum package               | Planned.                                                           |
+|   ☐    | Easy OAuth onboarding        | Planned.                                                           |
 
 Defaults: **12-hour time**, a fixed **7am–9pm** day view, and **one month back / six months ahead** of cached events. Editing a whole recurring series, managing guests, and continuous scheduled sync are not implemented.
 
@@ -37,7 +43,7 @@ Follow these steps in order. Commands run **on your computer**, in an Ubuntu ter
 
 You need:
 
-- A Paper Pro Move with [XOVI](https://github.com/asivery/rm-xovi-extensions) and [AppLoad](https://github.com/asivery/rm-appload) installed and working. Follow their installation instructions for your tablet and firmware first.
+- A Paper Pro (or Move) with [XOVI](https://github.com/asivery/rm-xovi-extensions) and [AppLoad](https://github.com/asivery/rm-appload) installed and working. Follow their installation instructions for your tablet and firmware first.
 - The tablet's SSH password or an SSH key already configured for it.
 - A USB connection between your computer and tablet, and Wi-Fi on the tablet for Google sync.
 - Ubuntu Linux, or Ubuntu in WSL on Windows. The commands below use the standard x86-64 Ubuntu cross compiler.
@@ -136,9 +142,9 @@ If the backend reports a glibc compatibility error when launched on your tablet,
 
 Enter the tablet password when requested. The script installs the files under `/home/root/xovi/exthome/appload/remarkable-calendar` and prints a confirmation when complete.
 
-On the tablet, open **AppLoad** and select **Reload**. If you only want local events, open **Calendar** now and skip to [Use Calendar](#use-calendar).
-
 For Google sync, keep Calendar closed until you complete the initial timezone setup below. This avoids saving the default UTC timezone before you choose your own.
+
+If you only want local events, open **AppLoad** on your tablet and select **Reload**. Open **Calendar** now and skip to [Use Calendar](#use-calendar).
 
 ### 6. Create your Google OAuth client
 
@@ -205,7 +211,7 @@ If you already opened Calendar **and saved Settings**, the timezone may already 
 
 On the tablet:
 
-1. Open **AppLoad → Calendar**.
+1. Open **AppLoad → Calendar**. (Tap Reload if it doesn't show up)
 2. Tap the **gear icon** to open Settings.
 3. Confirm that **Display timezone** shows the timezone you chose.
 4. Tap **Refresh list** if needed, then select the Google calendars you want to display.
@@ -216,18 +222,18 @@ Your events should now appear in the week view. Open an event to check its time,
 
 ## Use Calendar
 
-| To… | Do this |
-| --- | --- |
-| Change weeks or days | Swipe left/right or tap the toolbar arrows. |
-| Return to today | Tap Today. |
-| Open a day's schedule | Tap a day's date, More events…, or the Day View toolbar icon. |
-| Read event details | Tap an event. Tap X to return to the previous view. |
-| Create an event | Tap +, choose a calendar, enter details, and save. |
-| Keep an event on the tablet only | Choose Local events in the editor. |
-| Edit or delete | Open an event and tap the pencil or trash icon. |
-| Hide the keyboard | Tap Done, outside the field, or close the editor. |
-| Refresh Google events | Tap Sync while connected to Wi-Fi. |
-| Review pending changes | Open Settings. |
+| To…                              | Do this                                                       |
+| -------------------------------- | ------------------------------------------------------------- |
+| Change weeks or days             | Swipe left/right or tap the toolbar arrows.                   |
+| Return to today                  | Tap Today.                                                    |
+| Open a day's schedule            | Tap a day's date, More events…, or the Day View toolbar icon. |
+| Read event details               | Tap an event. Tap X to return to the previous view.           |
+| Create an event                  | Tap +, choose a calendar, enter details, and save.            |
+| Keep an event on the tablet only | Choose Local events in the editor.                            |
+| Edit or delete                   | Open an event and tap the pencil or trash icon.               |
+| Hide the keyboard                | Tap Done, outside the field, or close the editor.             |
+| Refresh Google events            | Tap Sync while connected to Wi-Fi.                            |
+| Review pending changes           | Open Settings.                                                |
 
 The editor uses `YYYY-MM-DD` dates and `HH:MM` **24-hour entry**, regardless of the display format. Recurring-event edits affect only the selected occurrence. Google calendars must give you write access for editing.
 
@@ -246,18 +252,18 @@ Repeat **Step 4** to build, close Calendar, and repeat **Step 5** to deploy. Sel
 
 ## Troubleshooting
 
-| Problem | What to check |
-| --- | --- |
-| SSH cannot connect | Check USB, the tablet address, and SSH credentials. |
-| `cargo` or `rustup` not found | Run `. "$HOME/.cargo/env"` or reopen Ubuntu. |
-| Resource compiler missing | Install Qt 6 tools and use the actual Qt 6 `rcc` path. |
-| Deploy says a file is missing | Complete both backend and UI builds in Step 4. |
-| Blank screen or old UI | Close Calendar, choose AppLoad → Reload, and reopen it. |
-| Backend reports `GLIBC_… not found` | Use a compatible SDK toolchain; see [Development](docs/development.md#build-for-the-tablet). |
-| Google calendars are missing | Check Wi-Fi, credentials, and Settings → Refresh list. |
-| Events are missing | Check calendar selections and the offline date window, then sync. |
-| Times are incorrect | Check the [saved display timezone](docs/google-calendar.md#change-an-already-saved-timezone). |
-| Google edits are unavailable | Grant both OAuth permissions and complete an online sync; check calendar write access. |
-| Google authorization expires | Repeat sign-in with a new output file; see the [Google guide](docs/google-calendar.md). |
+| Problem                             | What to check                                                                                 |
+| ----------------------------------- | --------------------------------------------------------------------------------------------- |
+| SSH cannot connect                  | Check USB, the tablet address, and SSH credentials.                                           |
+| `cargo` or `rustup` not found       | Run `. "$HOME/.cargo/env"` or reopen Ubuntu.                                                  |
+| Resource compiler missing           | Install Qt 6 tools and use the actual Qt 6 `rcc` path.                                        |
+| Deploy says a file is missing       | Complete both backend and UI builds in Step 4.                                                |
+| Blank screen or old UI              | Close Calendar, choose AppLoad → Reload, and reopen it.                                       |
+| Backend reports `GLIBC_… not found` | Use a compatible SDK toolchain; see [Development](docs/development.md#build-for-the-tablet).  |
+| Google calendars are missing        | Check Wi-Fi, credentials, and Settings → Refresh list.                                        |
+| Events are missing                  | Check calendar selections and the offline date window, then sync.                             |
+| Times are incorrect                 | Check the [saved display timezone](docs/google-calendar.md#change-an-already-saved-timezone). |
+| Google edits are unavailable        | Grant both OAuth permissions and complete an online sync; check calendar write access.        |
+| Google authorization expires        | Repeat sign-in with a new output file; see the [Google guide](docs/google-calendar.md).       |
 
 Architecture, testing, source changes, and backups are covered in [Development](docs/development.md). Additional account setup details are in the [Google Calendar guide](docs/google-calendar.md).
