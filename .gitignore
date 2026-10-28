@@ -1,0 +1,10 @@
+/target/
+/dist/
+*.sqlite3
+
+# Google authorization files must stay outside source control.
+google.json
+client_secret*.json
+credentials*.json
+
+__pycache__/

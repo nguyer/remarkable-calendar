@@ -1,0 +1,9 @@
+{
+  "id": "org.remarkablecalendar.move",
+  "name": "Calendar",
+  "loadsBackend": true,
+  "entry": "/qml/Main.qml",
+  "supportsScaling": false,
+  "canHaveMultipleFrontends": false,
+  "aspectRatio": "move"
+}

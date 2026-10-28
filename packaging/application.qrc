@@ -1,0 +1,16 @@
+<RCC>
+  <qresource prefix="/">
+    <file alias="qml/CalendarEvent.qml">../qml/CalendarEvent.qml</file>
+    <file alias="qml/ChangeConfirmation.qml">../qml/ChangeConfirmation.qml</file>
+    <file alias="qml/DayView.qml">../qml/DayView.qml</file>
+    <file alias="qml/DetailsView.qml">../qml/DetailsView.qml</file>
+    <file alias="qml/EventEditor.qml">../qml/EventEditor.qml</file>
+    <file alias="qml/EventView.qml">../qml/EventView.qml</file>
+    <file alias="qml/Main.qml">../qml/Main.qml</file>
+    <file alias="qml/SettingsAction.qml">../qml/SettingsAction.qml</file>
+    <file alias="qml/SettingsView.qml">../qml/SettingsView.qml</file>
+    <file alias="qml/ToolbarButton.qml">../qml/ToolbarButton.qml</file>
+    <file alias="qml/ToolbarTitle.qml">../qml/ToolbarTitle.qml</file>
+    <file alias="qml/WeekView.qml">../qml/WeekView.qml</file>
+  </qresource>
+</RCC>
