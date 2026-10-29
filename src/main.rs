@@ -293,6 +293,38 @@ fn sync_route(
     authorized: bool,
     body: &[u8],
 ) -> (&'static str, String) {
+    if path == "/navigation" {
+        return match method {
+            "GET" => match settings::navigation(db) {
+                Ok(state) => (
+                    "200 OK",
+                    serde_json::json!({"navigation":state}).to_string(),
+                ),
+                Err(e) => (
+                    "500 Internal Server Error",
+                    serde_json::json!({"error":e.to_string()}).to_string(),
+                ),
+            },
+            "POST" if !authorized => (
+                "403 Forbidden",
+                serde_json::json!({"error":"Request header required"}).to_string(),
+            ),
+            "POST" => match serde_json::from_slice::<settings::Navigation>(body)
+                .map_err(Into::into)
+                .and_then(|state| settings::save_navigation(db, &state))
+            {
+                Ok(()) => ("200 OK", r#"{"ok":true}"#.into()),
+                Err(e) => (
+                    "400 Bad Request",
+                    serde_json::json!({"error":e.to_string()}).to_string(),
+                ),
+            },
+            _ => (
+                "405 Method Not Allowed",
+                serde_json::json!({"error":"GET or POST only"}).to_string(),
+            ),
+        };
+    }
     if method == "GET" && path.starts_with("/events/item?") {
         let result = reqwest::Url::parse(&format!("http://localhost{path}"))
             .map_err(|e| e.into())

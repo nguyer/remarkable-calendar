@@ -1,5 +1,7 @@
 <RCC>
   <qresource prefix="/">
+    <file alias="qml/CalendarToolbar.qml">../qml/CalendarToolbar.qml</file>
+    <file alias="qml/DayPage.qml">../qml/DayPage.qml</file>
     <file alias="qml/CalendarEvent.qml">../qml/CalendarEvent.qml</file>
     <file alias="qml/ChangeConfirmation.qml">../qml/ChangeConfirmation.qml</file>
     <file alias="qml/DayView.qml">../qml/DayView.qml</file>

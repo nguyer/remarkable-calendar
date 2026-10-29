@@ -35,7 +35,9 @@ Weeks start on Monday and use a Monday-inclusive, next-Monday-exclusive interval
 | File                                                           | Responsibility                                                |
 | -------------------------------------------------------------- | ------------------------------------------------------------- |
 | `WeekView.qml`                                                 | Weekly toolbar, date labels, event columns, and week gestures |
-| `DetailsView.qml`                                              | Shared day/event toolbar and screen container                 |
+| `CalendarToolbar.qml` | Shared primary-view navigation, Settings, Sync, and top-edge gesture space |
+| `DayPage.qml` | Primary day screen containing its toolbar and schedule |
+| `DetailsView.qml`                                              | Event details overlay and toolbar                 |
 | `DayView.qml`                                                  | All-day events, hourly schedule, and day gestures             |
 | `EventView.qml`                                                | Event details                                                 |
 | `EventEditor.qml`                                              | Create/edit form and keyboard                                 |
@@ -173,3 +175,11 @@ For host debugging, start `cargo run -- serve` and inspect `http://127.0.0.1:387
 | `POST /events/change`                   | Create, update, delete, or discard a local/queued change      |
 
 Mutation requests require `X-RemarkableCalendar-Request: sync`. JSON requests use `Content-Type: application/json`; bodies are limited to 64 KiB. The header blocks simple cross-origin browser submissions; it is not authentication against other local programs. Request deadlines and navigation generation guards prevent stale responses from replacing newer views.
+
+## Restoring the last calendar view
+
+Week and day are primary screens selected by `Main.qml`'s `primaryView`. Event details, editing, and Settings are overlays; opening them does not replace the primary view. `CalendarToolbar.qml` is shared by both primary screens and leaves the top 12 pixels without input handlers, matching the original week screen so AppLoad can handle pull-down gestures.
+
+`GET /navigation` returns `{"navigation":null}` on a fresh database, or a saved `{view,date}` record. `POST /navigation` validates and saves that record with the usual mutation header. Navigation is stored in its own `navigation_state` table; Settings saves and calendar sync do not modify it. Week dates identify the displayed Monday, and day dates identify the displayed day. The frontend restores navigation before starting its initial calendar loads and serializes subsequent writes to preserve their order. Only successfully displayed dates are saved, rather than targets of failed requests. Closing from an overlay restores the underlying primary screen on the next launch.
+
+The navigation harness (`node tests/navigation.cjs`) checks restoration and ordered writes; HTTP tests verify validation, settings isolation, and persistence across process restart. AppLoad pull-down access still needs a physical tablet check after deployment.

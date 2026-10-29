@@ -6,7 +6,7 @@ Rectangle {
     anchors.fill: parent
     color: "white"
     signal close
-    function unloading() { if(changeRequest) changeRequest.abort(); changeDeadline.stop(); cancelDayRequest(); ++settingsSerial; settingsDeadline.stop(); if (settingsRequest) settingsRequest.abort(); ++generation; ++syncSerial; retry.stop(); requestDeadline.stop(); syncPoll.stop(); syncDeadline.stop(); if (activeRequest) activeRequest.abort(); if (syncRequest) syncRequest.abort(); endpoint.terminate() }
+    function unloading() { navigationRetry.stop(); navigationDeadline.stop(); if(navigationRequest) navigationRequest.abort(); if(changeRequest) changeRequest.abort(); changeDeadline.stop(); cancelDayRequest(); ++settingsSerial; settingsDeadline.stop(); if (settingsRequest) settingsRequest.abort(); ++generation; ++syncSerial; retry.stop(); requestDeadline.stop(); syncPoll.stop(); syncDeadline.stop(); if (activeRequest) activeRequest.abort(); if (syncRequest) syncRequest.abort(); endpoint.terminate() }
     AppLoad { id: endpoint; applicationID: "org.remarkablecalendar.move" }
     property date selectedDate: new Date()
     property date displayedDate: new Date()
@@ -32,6 +32,7 @@ Rectangle {
             if (!displayPrefs.day_scroll) dayList.contentY=0
         }
     }
+    property string primaryView: "week"
     property string detailsLevel: ""
     property string eventReturnScreen: ""
     property var daySchedule: []
@@ -153,7 +154,7 @@ Rectangle {
         if (syncBusy || changeBusy) return
         editMessage=""; editField=""; keyboardSymbols=false
         var d=event && event.details ? event.details : null
-        var date=detailsLevel === "day" ? detailDayDate : (isoDate(monday(displayedDate))===isoDate(monday(todayDate)) ? todayDate : monday(displayedDate))
+        var date=primaryView === "day" ? detailDayDate : (isoDate(monday(displayedDate))===isoDate(monday(todayDate)) ? todayDate : monday(displayedDate))
         originalDescription=d ? d.description : ""
         originalPlainDescription=plainDescription(originalDescription)
         editDraft={operation:event ? "update" : "create",id:event ? event.id : "",calendar_id:d && !d.local_event ? d.calendar_id : "local",
@@ -206,8 +207,8 @@ Rectangle {
                 root.loadWeek()
                 if(change.operation==="discard") {root.fetchSettings();return}
                 if(change.operation==="delete") {
-                    detailsLevel=eventReturnScreen
-                    if(detailsLevel==="day") loadDay(detailDayDate)
+                    detailsLevel=""
+                    if(primaryView==="day") loadDay(detailDayDate)
                 } else if(result.event) {
                     var dateKey=isoDate(detailDayDate)
                     var rows=dayDetailEvents.filter(function(e){return e.id!==result.event.id})
@@ -221,7 +222,7 @@ Rectangle {
                     }
                     rows.sort(function(a,b){return a.start.localeCompare(b.start) || a.title.localeCompare(b.title)})
                     dayDetailEvents=rows;daySchedule=scheduleEvents(rows)
-                    var origin=detailsLevel==="day" ? "day" : (detailsLevel==="event" ? eventReturnScreen : "")
+                    var origin=primaryView==="day" ? "day" : ""
                     openEvent(uiEvent(result.event),origin)
                 }
                 if(result.queued) requestSync(true)
@@ -311,13 +312,15 @@ Rectangle {
         requestedDayDate = new Date(date)
         dayDetailEvents = input
         daySchedule = scheduleEvents(input)
+        rememberNavigation()
         var first = daySchedule.length ? Math.min(7,Math.max(0,Math.floor(daySchedule[0].startMinute/60)-1)) : 7
         dayList.contentY = displayPrefs.day_scroll ? Math.min(first*hourHeight,Math.max(0,dayList.contentHeight-dayList.height)) : 0
     }
     function openDay(offset) {
         if (offset < 0 || offset > 6) return
         cancelDayRequest()
-        detailsLevel = "day"
+        primaryView = "day"
+        detailsLevel = ""
         setDay(root.dayAt(offset),events.filter(function(e) { return e.offset === offset }))
     }
     function loadDay(date) {
@@ -352,12 +355,13 @@ Rectangle {
     function showWeek() {
         cancelDayRequest()
         detailsLevel=""
+        primaryView="week"
         var target=new Date(detailDayDate)
         if (selectedDate.getTime()===target.getTime()) loadWeek()
         else selectedDate=target
     }
     function openEvent(event, origin) {
-        eventReturnScreen = typeof origin === "string" ? origin : (detailsLevel === "day" ? "day" : "")
+        eventReturnScreen = typeof origin === "string" ? origin : (primaryView === "day" ? "day" : "")
         cancelDayRequest()
         requestedDayDate=new Date(detailDayDate)
         activeDetailEvent=event
@@ -365,7 +369,7 @@ Rectangle {
         eventDetailsScroll.contentY=0
         if(root.refreshActiveEvent) root.refreshActiveEvent()
     }
-    function closeEvent() { detailsLevel=eventReturnScreen }
+    function closeEvent() { detailsLevel="" }
     function openTimelineTap(x,y) {
         var contentWidth=dayList.width-90
         var g=dayGeometry()
@@ -465,6 +469,7 @@ Rectangle {
                     if(result.google && result.google.pending_count) root.backendStatus += " · "+result.google.pending_count+" pending changes"
                     root.events = arrangeEvents(newEvents)
                     root.displayedDate = new Date(selectedDate)
+                    if (root.primaryView === "week") root.rememberNavigation()
                 } catch (err) { fail("Invalid backend response: " + err) }
             } else fail("Backend unavailable")
         }
@@ -497,6 +502,7 @@ Rectangle {
                 } else if (result.state === "succeeded" || result.state === "failed") {
                     // Refresh even after a partial failure: earlier calendars may have committed.
                     root.loadWeek()
+                    if(root.primaryView === "day") root.loadDay(root.detailDayDate)
                     root.refreshActiveEvent(result.state==="succeeded" && result.kind!=="calendars")
                     if (root.settingsOpen && !root.settingsDirty) root.fetchSettings()
                 }
@@ -576,6 +582,7 @@ Rectangle {
             settingsDirty = false
             settingsOpen = false
             root.loadWeek()
+            if(root.primaryView === "day") root.loadDay(root.detailDayDate)
             if (draft.selected_ids.length) root.requestSync(true)
         })
     }
@@ -615,11 +622,76 @@ Rectangle {
             root.fail("Backend request timed out")
         }
     }
-    onSelectedDateChanged: { failures = 0; loadWeek() }
-    Component.onCompleted: { layoutReady = true; loadWeek(); requestSync(false) }
+    onSelectedDateChanged: { if (navigationReady) { failures = 0; loadWeek() } }
+    Component.onCompleted: { layoutReady = true; restoreNavigation(); requestSync(false) }
+    property bool navigationReady: false
+    property var navigationRequest: null
+    property string navigationPending: ""
+    property int navigationFailures: 0
+    function rememberNavigation() {
+        if (!navigationReady) return
+        navigationPending=JSON.stringify({view:primaryView,date:isoDate(primaryView === "day" ? detailDayDate : monday(displayedDate))})
+        navigationFailures=0
+        saveNavigation()
+    }
+    function saveNavigation() {
+        if (!navigationReady || navigationRequest || !navigationPending) return
+        var payload=navigationPending
+        var xhr=new XMLHttpRequest()
+        navigationRequest=xhr; navigationDeadline.restart()
+        xhr.onreadystatechange=function() {
+            if(xhr.readyState!==XMLHttpRequest.DONE || navigationRequest!==xhr) return
+            navigationRequest=null; navigationDeadline.stop()
+            if(xhr.status===200) {
+                if(navigationPending===payload) navigationPending=""
+                if(navigationPending) saveNavigation()
+            } else if(++navigationFailures<5) navigationRetry.restart()
+        }
+        xhr.open("POST","http://127.0.0.1:38765/navigation")
+        xhr.setRequestHeader("X-RemarkableCalendar-Request","sync")
+        xhr.setRequestHeader("Content-Type","application/json")
+        xhr.send(payload)
+    }
+    function restoreNavigation() {
+        if(navigationRequest || navigationReady) return
+        var xhr=new XMLHttpRequest()
+        navigationRequest=xhr; navigationDeadline.restart()
+        xhr.onreadystatechange=function() {
+            if(xhr.readyState!==XMLHttpRequest.DONE || navigationRequest!==xhr) return
+            navigationRequest=null; navigationDeadline.stop()
+            try {
+                if(xhr.status!==200) throw "Navigation unavailable"
+                var saved=JSON.parse(xhr.responseText).navigation
+                if(saved && (["week","day"].indexOf(saved.view)<0 || !/^\d{4}-\d{2}-\d{2}$/.test(saved.date))) throw "Invalid navigation"
+                if(saved) {
+                    primaryView=saved.view
+                    selectedDate=localDate(saved.date)
+                    displayedDate=new Date(selectedDate)
+                    detailDayDate=new Date(selectedDate)
+                    requestedDayDate=new Date(selectedDate)
+                }
+                navigationReady=true; navigationFailures=0
+                loadWeek()
+                if(primaryView==="day") loadDay(detailDayDate)
+            } catch(err) {
+                root.backendStatus="Cannot restore calendar view · reconnecting"
+                navigationRetry.restart()
+            }
+        }
+        xhr.open("GET","http://127.0.0.1:38765/navigation"); xhr.send()
+    }
+    Timer { id: navigationRetry; interval: 1000; onTriggered: root.navigationReady ? root.saveNavigation() : root.restoreNavigation() }
+    Timer {
+        id: navigationDeadline; interval: 4000
+        onTriggered: {
+            var xhr=root.navigationRequest; root.navigationRequest=null
+            if(xhr) xhr.abort()
+            if(!root.navigationReady || ++root.navigationFailures<5) navigationRetry.restart()
+        }
+    }
     // Shared state and requests stay here; screen components receive this controller.
     readonly property var weekView: weekPage.calendar
-    readonly property var dayList: detailsPage.timeline
+    readonly property var dayList: dayPage.timeline
     readonly property var eventDetailsScroll: detailsPage.eventScroll
     readonly property var keyboardInput: editorPage.keyboardInput
 
@@ -632,7 +704,8 @@ Rectangle {
         settingsOpen = false
     }
 
-    WeekView { id: weekPage; app: root; anchors.fill: parent }
+    WeekView { id: weekPage; app: root; anchors.fill: parent; visible: root.primaryView === "week" }
+    DayPage { id: dayPage; app: root; anchors.fill: parent; visible: root.primaryView === "day" }
     SettingsView { app: root }
     DetailsView { id: detailsPage; app: root }
     EventEditor { id: editorPage; app: root }

@@ -41,6 +41,7 @@ pub fn display(db: &Connection) -> Result<Value> {
 }
 pub fn init(db: &Connection) -> Result<()> {
     db.execute_batch("CREATE TABLE IF NOT EXISTS calendar_preferences (id TEXT PRIMARY KEY, name TEXT NOT NULL, color TEXT NOT NULL, enabled INTEGER NOT NULL, available INTEGER NOT NULL DEFAULT 1);
+        CREATE TABLE IF NOT EXISTS navigation_state (id INTEGER PRIMARY KEY CHECK(id=1), json TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS app_settings (id INTEGER PRIMARY KEY CHECK(id=1), json TEXT NOT NULL);
         INSERT OR IGNORE INTO calendar_preferences (id,name,color,enabled) SELECT calendar_id,calendar_id,'#55778b',1 FROM google_sync;")?;
     let has_role: bool = {
@@ -145,6 +146,33 @@ pub fn save(db: &Connection, s: &Settings) -> Result<()> {
         [serde_json::to_string(s)?],
     )?;
     tx.commit()?;
+    Ok(())
+}
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Navigation {
+    pub view: String,
+    pub date: String,
+}
+pub fn navigation(db: &Connection) -> Result<Option<Navigation>> {
+    use rusqlite::OptionalExtension;
+    let json: Option<String> = db
+        .query_row("SELECT json FROM navigation_state WHERE id=1", [], |r| {
+            r.get(0)
+        })
+        .optional()?;
+    json.map(|json| serde_json::from_str(&json).map_err(Into::into))
+        .transpose()
+}
+pub fn save_navigation(db: &Connection, state: &Navigation) -> Result<()> {
+    if !["week", "day"].contains(&state.view.as_str()) {
+        return Err("Choose a supported calendar view".into());
+    }
+    if crate::date(&state.date)?.to_string() != state.date {
+        return Err("Use a YYYY-MM-DD navigation date".into());
+    }
+    db.execute("INSERT INTO navigation_state VALUES (1,?1) ON CONFLICT(id) DO UPDATE SET json=excluded.json",
+        [serde_json::to_string(state)?])?;
     Ok(())
 }
 pub fn window(s: &Settings, today: NaiveDate) -> Result<(String, String)> {

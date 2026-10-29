@@ -48,7 +48,7 @@ Item {
     }
     Flickable {
         id: allDayList
-        visible: app.detailsLevel === "day"
+        visible: app.primaryView === "day"
         anchors.top: parent.top
         width: parent.width
         height: Math.min(200, allDayRows.height)
@@ -108,12 +108,12 @@ Item {
         height: app.dayDetailEvents.some(function (e) {
             return e.allDay;
         }) ? 2 : 0
-        visible: app.detailsLevel === "day" && height > 0
+        visible: app.primaryView === "day" && height > 0
         color: "#333333"
     }
     Flickable {
         id: dayList
-        visible: app.detailsLevel === "day"
+        visible: app.primaryView === "day"
         anchors.top: allDayDivider.bottom
         anchors.bottom: parent.bottom
         width: parent.width
@@ -204,7 +204,7 @@ Item {
         }
     }
     Rectangle {
-        visible: app.detailsLevel === "day" && !!app.dayMessage
+        visible: app.primaryView === "day" && !!app.dayMessage
         anchors.bottom: parent.bottom
         width: parent.width
         height: dayNotice.implicitHeight + 16

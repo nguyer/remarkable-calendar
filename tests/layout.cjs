@@ -5,6 +5,8 @@ const assert = require('node:assert/strict');
 const qml = fs.readFileSync('qml/Main.qml', 'utf8');
 const body = qml.slice(qml.indexOf('    function arrangeEvents('), qml.indexOf('    function reflowEvents('));
 const context = {
+    primaryView: "week",
+    rememberNavigation() {},
     weekView: {width: 954, height: 7 * 136},
     displayPrefs: {time_format:'24h',day_scroll:true,day_start:420,day_end:1260},
     timeMeasure: {implicitHeight: 21, forceLayout() {}},
@@ -70,8 +72,10 @@ context.detailsLevel = "";
 context.eventDetailsScroll = {contentY:0};
 context.root = {refreshActiveEvent() {},dayAt(offset) { return new Date(2026,9,26+offset,12); }};
 context.openWeeklyTap(20,20); // Date badge.
-assert.equal(context.detailsLevel,'day');
+assert.equal(context.primaryView,'day');
+assert.equal(context.detailsLevel,'');
 assert.equal(context.dayDetailEvents.length,7);
+context.primaryView="week";
 context.openWeeklyTap(90,15); // First event in the left column.
 assert.equal(context.detailsLevel,'event');
 assert.equal(context.activeDetailEvent.start,'09:00');
@@ -82,10 +86,12 @@ context.openDay(0);
 context.openEvent(context.dayDetailEvents[0]);
 assert.equal(context.eventReturnScreen,'day');
 context.closeEvent();
-assert.equal(context.detailsLevel,'day', 'day event closes back to the hourly schedule');
+assert.equal(context.detailsLevel,'');
+assert.equal(context.primaryView,'day', 'day event closes back to the hourly schedule');
 
 context.openWeeklyTap(900,183); // Bottom-right More events notice.
-assert.equal(context.detailsLevel,'day');
+assert.equal(context.primaryView,'day');
+assert.equal(context.detailsLevel,'');
 context.Qt = {formatDate(date) { return date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0'); }};
 context.isoDate = context.Qt.formatDate;
 assert.equal(context.eventSpan({allDay:true,details:{start_day:'2026-11-01',end_day:'2026-11-03'}}),'All day · 2026-11-01 – 2026-11-02');

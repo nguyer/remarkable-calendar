@@ -4,80 +4,10 @@ Item {
     required property var app
 
     property alias calendar: weekView
-    Column {
+    CalendarToolbar {
         id: heading
-        height: app.toolbarHeight
-        width: parent.width
-        Item {
-            width: 1
-            height: 12
-        }
-        Item {
-            width: parent.width
-            height: 70
-            ToolbarButton {
-                id: previousButton
-                anchors.left: parent.left
-                icon: "previous"
-                label: "Previous week"
-                onTriggered: app.shiftWeek(-1)
-            }
-            ToolbarButton {
-                id: dayViewButton
-                anchors.left: previousButton.right
-                icon: "day"
-                label: "Day view"
-                onTriggered: app.openToolbarDay()
-            }
-            ToolbarButton {
-                id: todayButton
-                anchors.left: dayViewButton.right
-                icon: "today"
-                label: "Go to today"
-                onTriggered: app.selectedDate = new Date()
-            }
-            ToolbarButton {
-                anchors.left: todayButton.right
-                icon: "add"
-                label: "New event"
-                enabled: !app.syncBusy
-                onTriggered: app.beginEdit(null)
-            }
-            ToolbarButton {
-                id: settingsButton
-                anchors.right: nextButton.left
-                icon: "settings"
-                label: "Calendar and sync settings"
-                onTriggered: {
-                    app.settingsOpen = true;
-                    app.fetchSettings();
-                }
-            }
-            ToolbarTitle {
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: Qt.formatDate(app.dayAt(0), "MMM d") + " – " + Qt.formatDate(app.dayAt(6), "MMM d")
-            }
-            ToolbarButton {
-                anchors.right: settingsButton.left
-                icon: "sync"
-                label: app.syncBusy ? "Sync in progress" : "Sync calendars"
-                busy: app.syncBusy
-                enabled: !app.syncBusy
-                onTriggered: app.requestSync(true)
-            }
-            ToolbarButton {
-                id: nextButton
-                anchors.right: parent.right
-                icon: "next"
-                label: "Next week"
-                onTriggered: app.shiftWeek(1)
-            }
-        }
-        Rectangle {
-            width: parent.width
-            height: 2
-            color: "#222222"
-        }
+        app: parent.app
+        view: "week"
     }
     Item {
         id: weekView

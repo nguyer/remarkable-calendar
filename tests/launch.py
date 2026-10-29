@@ -5,6 +5,24 @@ ROOT=pathlib.Path(__file__).resolve().parents[1]
 BIN=ROOT/'target/debug/remarkable-calendar-core'
 def get(path):
     with urllib.request.urlopen('http://127.0.0.1:38765'+path,timeout=2) as r: return json.load(r)
+def navigation_checks():
+    assert get('/navigation') == {'navigation':None}
+    original_settings = get('/settings')['settings']
+    def save(state, authorized=True):
+        request=urllib.request.Request('http://127.0.0.1:38765/navigation', data=json.dumps(state).encode(),
+            headers={'X-RemarkableCalendar-Request':'sync','Content-Type':'application/json'} if authorized else {})
+        try:
+            with urllib.request.urlopen(request,timeout=2) as response: return response.status
+        except urllib.error.HTTPError as error: return error.code
+    assert save({'view':'day','date':'2027-01-02'},False)==403
+    assert save({'view':'day','date':'2027-01-02'})==200
+    for invalid in [{'view':'event','date':'2027-01-02'}, {'view':'day','date':'2027-02-30'}, {'view':'week','date':'invalid'}]:
+        assert save(invalid)==400
+    assert get('/navigation')['navigation']=={'view':'day','date':'2027-01-02'}
+    assert get('/settings')['settings']==original_settings
+    assert save({'view':'week','date':'2026-12-28'})==200
+    assert save({'view':'day','date':'2027-01-02'})==200
+    print('PASS: navigation defaults, guarded saves, validation, and settings isolation')
 def sync_checks(tmp):
     def post(headers):
         request = urllib.request.Request('http://127.0.0.1:38765/google/sync', data=b'', headers=headers)
@@ -134,6 +152,7 @@ with tempfile.TemporaryDirectory() as tmp:
         except PermissionError:
             print('SKIP: AppLoad lifecycle test: host denies AF_UNIX socket creation')
             p=subprocess.Popen([BIN,'serve'],env=env);ready(p)
+            navigation_checks()
             sync_checks(tmp)
             assert len(get('/week?date=2026-10-26')['events'])==1
             assert get('/week?date=2026-11-02')['events']==[]
@@ -149,6 +168,7 @@ with tempfile.TemporaryDirectory() as tmp:
         p=subprocess.Popen([BIN,tmp+'/app.sock'],env=env)
         c,_=s.accept()
         assert ready(p)=={'ok':True}
+        navigation_checks()
         sync_checks(tmp)
         assert get('/week?date=2026-10-26')['events'][0]['id']=='planning-2026-10-26'
         assert get('/week?date=2026-11-02')['events']==[]
@@ -160,6 +180,7 @@ with tempfile.TemporaryDirectory() as tmp:
         c.close();p.wait(timeout=5);assert p.returncode==0
         p=subprocess.Popen([BIN,'serve'],env=env);ready(p)
         assert len(get('/week?date=2027-01-03')['events'])==1
+        assert get('/navigation')['navigation']=={'view':'day','date':'2027-01-02'}
         assert len(get('/events/pending'))==1
         assert get('/week?date=2026-12-10')['events'][0]['details']['pending'] is True
         p.terminate();p.wait(timeout=5)
