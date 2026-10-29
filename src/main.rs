@@ -160,6 +160,9 @@ fn event_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<Event> {
 fn week(db: &Connection, d: NaiveDate) -> Result<Week> {
     let start = monday(d);
     let end = start + Duration::days(7);
+    event_range(db, start, end)
+}
+fn event_range(db: &Connection, start: NaiveDate, end: NaiveDate) -> Result<Week> {
     let mut stmt=db.prepare("SELECT id,title,day,start,end,color,end_day,all_day,details FROM events WHERE COALESCE(end_day,day)>=?1 AND day<?2 ORDER BY day,start,id")?;
     let events = stmt
         .query_map(params![start.to_string(), end.to_string()], event_row)?
@@ -216,6 +219,19 @@ fn week(db: &Connection, d: NaiveDate) -> Result<Week> {
         display: settings::display(db)?,
     })
 }
+fn month(db: &Connection, d: NaiveDate) -> Result<serde_json::Value> {
+    let first = d.with_day(1).ok_or("invalid month")?;
+    let next = first
+        .checked_add_months(chrono::Months::new(1))
+        .ok_or("invalid month end")?;
+    let start = monday(first);
+    let end = monday(next - Duration::days(1)) + Duration::days(7);
+    let grid = event_range(db, start, end)?;
+    Ok(
+        serde_json::json!({"month":first.to_string(),"start":start.to_string(),"end":end.to_string(),
+        "events":grid.events,"google":grid.google,"display":grid.display}),
+    )
+}
 fn route(db: &Connection, method: &str, path: &str) -> (&'static str, String) {
     if method != "GET" {
         return ("405 Method Not Allowed", r#"{"error":"GET only"}"#.into());
@@ -231,6 +247,15 @@ fn route(db: &Connection, method: &str, path: &str) -> (&'static str, String) {
     }
     if path == "/health" {
         return ("200 OK", r#"{"ok":true}"#.into());
+    }
+    if let Some(s) = path.strip_prefix("/month?date=") {
+        return match date(s).and_then(|d| month(db, d)) {
+            Ok(value) => ("200 OK", value.to_string()),
+            Err(e) => (
+                "400 Bad Request",
+                serde_json::json!({"error":e.to_string()}).to_string(),
+            ),
+        };
     }
     if let Some(s) = path.strip_prefix("/week?date=") {
         return match date(s).and_then(|d| week(db, d)) {
@@ -548,6 +573,37 @@ fn serve(db: Connection, socket: Option<&str>) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn month_grid_and_event_segments() -> Result<()> {
+        let mut db = database(std::path::Path::new(":memory:"))?;
+        let events: Vec<Event> = serde_json::from_value(serde_json::json!([
+            {"id":"overnight","title":"Overnight","day":"2026-10-31","start":"23:00","end":"00:00","end_day":"2026-11-02","color":"#123456"},
+            {"id":"all-day","title":"Trip","day":"2026-11-02","start":"00:00","end":"00:00","end_day":"2026-11-04","all_day":true,"color":"#654321"},
+            {"id":"last","title":"Last grid day","day":"2026-12-06","start":"09:00","end":"10:00","color":"#123456"},
+            {"id":"outside","title":"Outside","day":"2026-12-07","start":"09:00","end":"10:00","color":"#123456"}
+        ]))?;
+        import(&mut db, &events)?;
+        let result = month(&db, date("2026-11-20")?)?;
+        assert_eq!(result["month"], "2026-11-01");
+        assert_eq!(result["start"], "2026-10-26");
+        assert_eq!(result["end"], "2026-12-07");
+        let rows = result["events"].as_array().unwrap();
+        assert_eq!(rows.len(), 5);
+        assert_eq!(rows[0]["day"], "2026-10-31");
+        assert_eq!(rows[1]["day"], "2026-11-01");
+        assert_eq!(rows[1]["details"]["start_day"], "2026-10-31");
+        assert_eq!(rows[2]["all_day"], true);
+        assert_eq!(rows[4]["id"], "last");
+        let february = month(&db, date("2021-02-01")?)?;
+        assert_eq!(february["start"], "2021-02-01");
+        assert_eq!(february["end"], "2021-03-01");
+        assert!(february["events"].as_array().unwrap().is_empty());
+        assert_eq!(
+            route(&db, "GET", "/month?date=2026-02-30").0,
+            "400 Bad Request"
+        );
+        Ok(())
+    }
     #[test]
     fn boundaries_and_persistence() -> Result<()> {
         let p = env::temp_dir().join(format!(

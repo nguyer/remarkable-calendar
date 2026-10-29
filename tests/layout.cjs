@@ -139,6 +139,7 @@ assert.equal(context.activeDetailEvent.start,'06:00','fixed-grid hit testing mus
 context.displayPrefs.time_format='24h';
 assert.equal(context.formatTime('21:00'),'21:00');
 // Toolbar Day view chooses today only for the currently displayed week.
+context.primaryView="week";
 context.monday=date=>{ const d=new Date(date);d.setDate(d.getDate()-((d.getDay()+6)%7));d.setHours(12,0,0,0);return d; };
 context.displayedDate=new Date(2026,9,26,12);
 context.todayDate=new Date(2026,9,28,12);
@@ -146,6 +147,15 @@ let opened=-1;context.openDay=offset=>{opened=offset;};
 context.openToolbarDay();assert.equal(opened,2);
 context.displayedDate=new Date(2026,10,2,12);
 context.openToolbarDay();assert.equal(opened,0);
+// Month -> Day chooses today only for the same month and year; active Day is a no-op.
+let dayTarget=null;context.openDate=date=>{dayTarget=date;};
+context.primaryView="month";context.monthDate=new Date(2026,9,1,12);
+context.openToolbarDay();assert.equal(context.isoDate(dayTarget),'2026-10-28');
+context.monthDate=new Date(2026,10,1,12);
+context.openToolbarDay();assert.equal(context.isoDate(dayTarget),'2026-11-01');
+context.monthDate=new Date(2025,9,1,12);
+context.openToolbarDay();assert.equal(context.isoDate(dayTarget),'2025-10-01');
+context.primaryView="day";dayTarget=null;context.openToolbarDay();assert.equal(dayTarget,null);
 // New-event defaults respect the last successful calendar, with safe fallbacks.
 const choices=[{id:'work'},{id:'personal'}];
 assert.equal(context.preferredCalendar('personal',choices),'personal');

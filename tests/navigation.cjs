@@ -21,6 +21,7 @@ const c = {
     loadWeek(){this.weeks=(this.weeks||0)+1;}, loadDay(d){this.loadedDay=this.isoDate(d);}
 };
 c.loadWeek=()=>{c.weeks=(c.weeks||0)+1;}; c.loadDay=d=>{c.loadedDay=c.isoDate(d);};
+c.loadMonth=d=>{c.loadedMonth=c.isoDate(d);};
 c.root=c; vm.createContext(c); vm.runInContext(helpers,c);
 c.rememberNavigation(); assert.equal(requests.length,0,'startup must not overwrite saved navigation');
 c.restoreNavigation(); requests.at(-1).respond({navigation:{view:'day',date:'2027-01-02'}});
@@ -35,4 +36,10 @@ assert.equal(c.navigationPending,'');
 c.primaryView='week'; c.displayedDate=new Date(2026,11,31,12); c.rememberNavigation();
 assert.deepEqual(JSON.parse(requests.at(-1).body),{view:'week',date:'2026-12-28'});
 requests.at(-1).respond({ok:true});
+c.primaryView='month'; c.monthDate=new Date(2027,0,1,12); c.rememberNavigation();
+assert.deepEqual(JSON.parse(requests.at(-1).body),{view:'month',date:'2027-01-01'});
+requests.at(-1).respond({ok:true});
+c.navigationReady=false; c.restoreNavigation();
+requests.at(-1).respond({navigation:{view:'month',date:'2026-12-01'}});
+assert.equal(c.primaryView,'month'); assert.equal(c.isoDate(c.monthDate),'2026-12-01');
 console.log('PASS: saved day restoration, startup guard, serialized navigation writes, and week boundaries');

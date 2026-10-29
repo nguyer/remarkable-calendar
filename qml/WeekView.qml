@@ -50,7 +50,7 @@ Item {
                             width: 80
                             height: dayRow.height - y
                             property bool isToday: app.isoDate(dayRow.day) === app.isoDate(app.todayDate)
-                            color: isToday ? "#74d2e8" : "#d9d9d9"
+                            color: isToday ? app.todayHighlight : "#d9d9d9"
                             Rectangle {
                                 anchors.right: parent.right
                                 width: 2

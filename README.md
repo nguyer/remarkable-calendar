@@ -16,7 +16,7 @@ The app appears as **Calendar** in AppLoad. It was designed for **reMarkable Pap
 | :----: | ---------------------------- | ------------------------------------------------------------------ |
 |   ☑    | Weekly overview              | Seven days with morning/afternoon columns and a today indicator.   |
 |   ☑    | Day schedule                 | Hourly timeline with a separate all-day events area.               |
-|   ☑    | Swipe navigation             | Swipe between weeks or days, or use the arrows and Today button.   |
+|   ☑    | Swipe navigation             | Swipe between months, weeks, or days, or use the arrows and Today button.   |
 |   ☑    | Event details                | Read times, location, description, and calendar information.       |
 |   ☑    | Multiple Google calendars    | Select calendars and display their Google Calendar colors.         |
 |   ☑    | Offline access               | View cached events and queue changes while disconnected.           |
@@ -28,7 +28,7 @@ The app appears as **Calendar** in AppLoad. It was designed for **reMarkable Pap
 |   ☑    | Display preferences          | Choose 12/24-hour time and fixed or scrolling day schedules.       |
 |   ☑    | Offline date window          | Choose how many months to keep on the tablet.                      |
 |   ☑    | Background sync              | Sync manually or refresh stale data when launching the app.        |
-|   ☐    | Month overview               | Planned.                                                           |
+| ☑ | Month overview | Tap ISO week numbers or dates to open their week or day; swipe between months. |
 |   ☐    | Year overview                | Planned.                                                           |
 |   ☐    | Vellum package               | Planned.                                                           |
 |   ☐    | Easy OAuth onboarding        | Planned.                                                           |
@@ -267,3 +267,5 @@ Repeat **Step 4** to build, close Calendar, and repeat **Step 5** to deploy. Sel
 | Google authorization expires        | Repeat sign-in with a new output file; see the [Google guide](docs/google-calendar.md).       |
 
 Architecture, testing, source changes, and backups are covered in [Development](docs/development.md). Additional account setup details are in the [Google Calendar guide](docs/google-calendar.md).
+
+The Month View toolbar button opens a Monday-first month grid. Tap a week number in the left margin to open that week, or a date to open its day schedule. Swipe left/right or use the arrows to change months; Today returns to the current month. The app remembers the displayed month when you close it. Each day has a bordered date square and compact event names with colored lines, without times. Busy days show a +N more label; tap the day to see its full schedule.

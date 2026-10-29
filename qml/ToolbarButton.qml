@@ -86,25 +86,32 @@ Item {
                 c.moveTo(25, 7);
                 c.lineTo(7, 25);
                 c.stroke();
-            } else if (button.icon === "day") {
-                c.rect(5, 5, 22, 23);
-                c.moveTo(5, 12);
-                c.lineTo(27, 12);
-                c.moveTo(11, 18);
-                c.lineTo(21, 18);
-                c.moveTo(11, 23);
-                c.lineTo(21, 23);
+            } else if (button.icon === "day" || button.icon === "week" || button.icon === "month") {
+                // A common calendar page; highlight one day, one week, or the full grid.
+                c.lineWidth = 2;
+                c.rect(3, 6, 26, 23);
+                c.moveTo(3, 12); c.lineTo(29, 12);
+                c.moveTo(10, 3); c.lineTo(10, 8);
+                c.moveTo(22, 3); c.lineTo(22, 8);
                 c.stroke();
-            } else if (button.icon === "week") {
-                c.rect(3, 5, 26, 23);
-                c.moveTo(3, 12);
-                c.lineTo(29, 12);
-                for (var day = 1; day < 7; day++) {
-                    var x = 3 + day * 26 / 7;
-                    c.moveTo(x, 12);
-                    c.lineTo(x, 28);
+                for (var row = 0; row < 3; row++) {
+                    for (var column = 0; column < 4; column++) {
+                        var x = 7 + column * 5;
+                        var y = 16 + row * 4;
+                        var highlighted = button.icon === "month"
+                            || (button.icon === "week" && row === 1)
+                            || (button.icon === "day" && row === 1 && column === 1);
+                        if (highlighted) {
+                            c.fillRect(x, y, 3, 3);
+                        } else {
+                            c.beginPath();
+                            c.strokeStyle = "#b8b8b8";
+                            c.lineWidth = 0.7;
+                            c.rect(x + 0.35, y + 0.35, 2.3, 2.3);
+                            c.stroke();
+                        }
+                    }
                 }
-                c.stroke();
             } else if (button.icon === "settings") {
                 c.arc(16, 16, 9, 0, Math.PI * 2);
                 c.stroke();

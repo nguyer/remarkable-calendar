@@ -6,7 +6,7 @@ Rectangle {
     anchors.fill: parent
     color: "white"
     signal close
-    function unloading() { navigationRetry.stop(); navigationDeadline.stop(); if(navigationRequest) navigationRequest.abort(); if(changeRequest) changeRequest.abort(); changeDeadline.stop(); cancelDayRequest(); ++settingsSerial; settingsDeadline.stop(); if (settingsRequest) settingsRequest.abort(); ++generation; ++syncSerial; retry.stop(); requestDeadline.stop(); syncPoll.stop(); syncDeadline.stop(); if (activeRequest) activeRequest.abort(); if (syncRequest) syncRequest.abort(); endpoint.terminate() }
+    function unloading() { cancelMonthRequest(); navigationRetry.stop(); navigationDeadline.stop(); if(navigationRequest) navigationRequest.abort(); if(changeRequest) changeRequest.abort(); changeDeadline.stop(); cancelDayRequest(); ++settingsSerial; settingsDeadline.stop(); if (settingsRequest) settingsRequest.abort(); ++generation; ++syncSerial; retry.stop(); requestDeadline.stop(); syncPoll.stop(); syncDeadline.stop(); if (activeRequest) activeRequest.abort(); if (syncRequest) syncRequest.abort(); endpoint.terminate() }
     AppLoad { id: endpoint; applicationID: "org.remarkablecalendar.move" }
     property date selectedDate: new Date()
     property date displayedDate: new Date()
@@ -22,6 +22,7 @@ Rectangle {
     property var syncRequest: null
     property int syncSerial: 0
     property int syncFailures: 0
+    readonly property color todayHighlight: "#74d2e8"
     readonly property int toolbarHeight: 84
     readonly property int hourHeight: 120
     property var displayPrefs: ({time_format:"12h",day_scroll:false,day_start:420,day_end:1260})
@@ -32,6 +33,7 @@ Rectangle {
             if (!displayPrefs.day_scroll) dayList.contentY=0
         }
     }
+    property date monthDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1, 12)
     property string primaryView: "week"
     property string detailsLevel: ""
     property string eventReturnScreen: ""
@@ -77,6 +79,36 @@ Rectangle {
     }
     function dayAtFor(date, offset) { var d = monday(date); d.setDate(d.getDate() + offset); return d }
     function dayAt(offset) { return dayAtFor(displayedDate, offset) }
+    function monthGeometry(date) {
+        var firstDay = new Date(date.getFullYear(), date.getMonth(), 1, 12)
+        var start = monday(firstDay)
+        var days = new Date(firstDay.getFullYear(), firstDay.getMonth() + 1, 0).getDate()
+        return {firstDay:firstDay,start:start,rows:Math.ceil(((firstDay.getDay()+6)%7+days)/7)}
+    }
+    function isoWeekNumber(date) {
+        var thursday = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+        thursday.setUTCDate(thursday.getUTCDate() + 4 - (thursday.getUTCDay() || 7))
+        var yearStart = new Date(Date.UTC(thursday.getUTCFullYear(), 0, 1))
+        return Math.ceil((((thursday - yearStart) / 86400000) + 1) / 7)
+    }
+    function openMonth(date) {
+        var target = date instanceof Date ? date : (primaryView === "day" ? detailDayDate : (primaryView === "month" ? monthDate : displayedDate))
+        cancelDayRequest()
+        primaryView = "month"
+        detailsLevel = ""
+        loadMonth(new Date(target.getFullYear(), target.getMonth(), 1, 12))
+    }
+    function shiftMonth(n) {
+        openMonth(new Date(requestedMonthDate.getFullYear(), requestedMonthDate.getMonth() + n, 1, 12))
+    }
+    function openDate(date) {
+        cancelMonthRequest()
+        cancelDayRequest()
+        primaryView = "day"
+        detailsLevel = ""
+        setDay(date, [])
+        loadDay(date)
+    }
     function arrangeEvents(input) {
         // Publish only the final measured layout; no visible intermediate column changes.
         titleMeasure.width = Math.max(1, (weekView.width - 10 - 86 - 18) / 2 - 15)
@@ -154,7 +186,7 @@ Rectangle {
         if (syncBusy || changeBusy) return
         editMessage=""; editField=""; keyboardSymbols=false
         var d=event && event.details ? event.details : null
-        var date=primaryView === "day" ? detailDayDate : (isoDate(monday(displayedDate))===isoDate(monday(todayDate)) ? todayDate : monday(displayedDate))
+        var date=primaryView === "month" ? monthDate : (primaryView === "day" ? detailDayDate : (isoDate(monday(displayedDate))===isoDate(monday(todayDate)) ? todayDate : monday(displayedDate)))
         originalDescription=d ? d.description : ""
         originalPlainDescription=plainDescription(originalDescription)
         editDraft={operation:event ? "update" : "create",id:event ? event.id : "",calendar_id:d && !d.local_event ? d.calendar_id : "local",
@@ -205,6 +237,7 @@ Rectangle {
                 if(xhr.status!==200) throw(result.error || "Could not save change")
                 confirmChange=null;editOpen=false;editField="";editMessage=""
                 root.loadWeek()
+                if(root.primaryView === "month") root.loadMonth(root.requestedMonthDate)
                 if(change.operation==="discard") {root.fetchSettings();return}
                 if(change.operation==="delete") {
                     detailsLevel=""
@@ -265,6 +298,13 @@ Rectangle {
         return {start:start,end:end,scale:scale,scroll:scroll}
     }
     function openToolbarDay() {
+        if (primaryView === "day") return
+        if (primaryView === "month") {
+            var today = new Date(todayDate)
+            var currentMonth = monthDate.getFullYear() === today.getFullYear() && monthDate.getMonth() === today.getMonth()
+            openDate(currentMonth ? today : new Date(monthDate))
+            return
+        }
         var start=monday(displayedDate)
         var today=new Date(todayDate)
         var delta=Math.round((monday(today).getTime()-start.getTime())/86400000)
@@ -352,11 +392,12 @@ Rectangle {
         date.setDate(date.getDate()+n)
         loadDay(date)
     }
-    function showWeek() {
+    function showWeek(date) {
+        cancelMonthRequest()
+        var target = date instanceof Date ? new Date(date) : new Date(primaryView === "month" ? monthDate : detailDayDate)
         cancelDayRequest()
         detailsLevel=""
         primaryView="week"
-        var target=new Date(detailDayDate)
         if (selectedDate.getTime()===target.getTime()) loadWeek()
         else selectedDate=target
     }
@@ -503,6 +544,7 @@ Rectangle {
                     // Refresh even after a partial failure: earlier calendars may have committed.
                     root.loadWeek()
                     if(root.primaryView === "day") root.loadDay(root.detailDayDate)
+                    if(root.primaryView === "month") root.loadMonth(root.requestedMonthDate)
                     root.refreshActiveEvent(result.state==="succeeded" && result.kind!=="calendars")
                     if (root.settingsOpen && !root.settingsDirty) root.fetchSettings()
                 }
@@ -583,6 +625,7 @@ Rectangle {
             settingsOpen = false
             root.loadWeek()
             if(root.primaryView === "day") root.loadDay(root.detailDayDate)
+            if(root.primaryView === "month") root.loadMonth(root.requestedMonthDate)
             if (draft.selected_ids.length) root.requestSync(true)
         })
     }
@@ -630,7 +673,7 @@ Rectangle {
     property int navigationFailures: 0
     function rememberNavigation() {
         if (!navigationReady) return
-        navigationPending=JSON.stringify({view:primaryView,date:isoDate(primaryView === "day" ? detailDayDate : monday(displayedDate))})
+        navigationPending=JSON.stringify({view:primaryView,date:isoDate(primaryView === "month" ? monthDate : (primaryView === "day" ? detailDayDate : monday(displayedDate)))})
         navigationFailures=0
         saveNavigation()
     }
@@ -662,17 +705,19 @@ Rectangle {
             try {
                 if(xhr.status!==200) throw "Navigation unavailable"
                 var saved=JSON.parse(xhr.responseText).navigation
-                if(saved && (["week","day"].indexOf(saved.view)<0 || !/^\d{4}-\d{2}-\d{2}$/.test(saved.date))) throw "Invalid navigation"
+                if(saved && (["week","day","month"].indexOf(saved.view)<0 || !/^\d{4}-\d{2}-\d{2}$/.test(saved.date))) throw "Invalid navigation"
                 if(saved) {
                     primaryView=saved.view
                     selectedDate=localDate(saved.date)
                     displayedDate=new Date(selectedDate)
                     detailDayDate=new Date(selectedDate)
                     requestedDayDate=new Date(selectedDate)
+                    monthDate=new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1, 12)
                 }
                 navigationReady=true; navigationFailures=0
                 loadWeek()
                 if(primaryView==="day") loadDay(detailDayDate)
+                if(primaryView==="month") loadMonth(monthDate)
             } catch(err) {
                 root.backendStatus="Cannot restore calendar view · reconnecting"
                 navigationRetry.restart()
@@ -687,6 +732,77 @@ Rectangle {
             var xhr=root.navigationRequest; root.navigationRequest=null
             if(xhr) xhr.abort()
             if(!root.navigationReady || ++root.navigationFailures<5) navigationRetry.restart()
+        }
+    }
+    property date requestedMonthDate: new Date(monthDate)
+    property var monthEvents: []
+    property string monthMessage: ""
+    property var monthRequest: null
+    property int monthSerial: 0
+    readonly property var monthTitleMeasure: monthPage.titleMeasure
+    function cancelMonthRequest() {
+        ++monthSerial
+        monthDeadline.stop()
+        var xhr=monthRequest; monthRequest=null
+        if(xhr) xhr.abort()
+        monthMessage=""
+    }
+    function loadMonth(date) {
+        cancelMonthRequest()
+        var wanted=new Date(date.getFullYear(),date.getMonth(),1,12)
+        requestedMonthDate=wanted
+        var serial=monthSerial
+        var xhr=new XMLHttpRequest(); monthRequest=xhr; monthDeadline.restart()
+        xhr.onreadystatechange=function() {
+            if(xhr.readyState!==XMLHttpRequest.DONE || serial!==monthSerial) return
+            monthDeadline.stop(); monthRequest=null
+            try {
+                if(xhr.status!==200) throw "Month unavailable · tap Sync to retry"
+                var result=JSON.parse(xhr.responseText)
+                var geometry=monthGeometry(wanted)
+                var end=new Date(geometry.start); end.setDate(end.getDate()+geometry.rows*7)
+                if(result.month!==isoDate(wanted) || result.start!==isoDate(geometry.start) || result.end!==isoDate(end) || !Array.isArray(result.events)) throw "Unexpected month response"
+                if(result.display) displayPrefs=result.display
+                monthDate=wanted
+                monthEvents=result.events
+                rememberNavigation()
+            } catch(err) { monthMessage=String(err); requestedMonthDate=new Date(monthDate) }
+        }
+        xhr.open("GET","http://127.0.0.1:38765/month?date="+isoDate(wanted)); xhr.send()
+    }
+    function arrangeMonthEvents(input, width, height) {
+        var grouped={}; var result={}
+        monthTitleMeasure.width=Math.max(1,width-27)
+        input.forEach(function(event) {
+            if(!grouped[event.day]) grouped[event.day]=[]
+            monthTitleMeasure.text=event.title
+            monthTitleMeasure.forceLayout()
+            grouped[event.day].push({id:event.id,title:event.title,color:event.color,height:Math.max(24,Math.ceil(monthTitleMeasure.implicitHeight))})
+        })
+        var available=Math.max(0,height-64-8-8)
+        Object.keys(grouped).forEach(function(day) {
+            var items=grouped[day]; var total=0
+            items.forEach(function(item,index) { total+=item.height+(index ? 6 : 0) })
+            var limit=total>available ? Math.max(0,available-24) : available
+            var entries=[]; var used=0
+            for(var i=0;i<items.length;i++) {
+                var gap=entries.length ? 6 : 0
+                if(used+gap+items[i].height>limit) break
+                items[i].y=used+gap
+                entries.push(items[i]); used+=gap+items[i].height
+            }
+            result[day]={entries:entries,hidden:items.length-entries.length}
+        })
+        return result
+    }
+    Timer {
+        id: monthDeadline; interval: 8000
+        onTriggered: {
+            ++root.monthSerial
+            var xhr=root.monthRequest; root.monthRequest=null
+            if(xhr) xhr.abort()
+            root.requestedMonthDate=new Date(root.monthDate)
+            root.monthMessage="Month request timed out · tap Sync to retry"
         }
     }
     // Shared state and requests stay here; screen components receive this controller.
@@ -706,6 +822,7 @@ Rectangle {
 
     WeekView { id: weekPage; app: root; anchors.fill: parent; visible: root.primaryView === "week" }
     DayPage { id: dayPage; app: root; anchors.fill: parent; visible: root.primaryView === "day" }
+    MonthView { id: monthPage; app: root; anchors.fill: parent; visible: root.primaryView === "month" }
     SettingsView { app: root }
     DetailsView { id: detailsPage; app: root }
     EventEditor { id: editorPage; app: root }

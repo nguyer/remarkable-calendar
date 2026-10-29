@@ -7,6 +7,12 @@ def get(path):
     with urllib.request.urlopen('http://127.0.0.1:38765'+path,timeout=2) as r: return json.load(r)
 def navigation_checks():
     assert get('/navigation') == {'navigation':None}
+    october=get('/month?date=2026-10-29')
+    assert october['month']=='2026-10-01' and october['start']=='2026-09-28' and october['end']=='2026-11-02'
+    assert any(e['id']=='planning-2026-10-26' for e in october['events'])
+    november=get('/month?date=2026-11-01')
+    assert november['start']=='2026-10-26' and november['end']=='2026-12-07'
+    assert any(e['id']=='planning-2026-10-26' for e in november['events'])
     original_settings = get('/settings')['settings']
     def save(state, authorized=True):
         request=urllib.request.Request('http://127.0.0.1:38765/navigation', data=json.dumps(state).encode(),
@@ -20,6 +26,8 @@ def navigation_checks():
         assert save(invalid)==400
     assert get('/navigation')['navigation']=={'view':'day','date':'2027-01-02'}
     assert get('/settings')['settings']==original_settings
+    assert save({'view':'month','date':'2026-12-01'})==200
+    assert get('/navigation')['navigation']=={'view':'month','date':'2026-12-01'}
     assert save({'view':'week','date':'2026-12-28'})==200
     assert save({'view':'day','date':'2027-01-02'})==200
     print('PASS: navigation defaults, guarded saves, validation, and settings isolation')
@@ -183,6 +191,8 @@ with tempfile.TemporaryDirectory() as tmp:
         assert get('/navigation')['navigation']=={'view':'day','date':'2027-01-02'}
         assert len(get('/events/pending'))==1
         assert get('/week?date=2026-12-10')['events'][0]['details']['pending'] is True
+        request=urllib.request.Request('http://127.0.0.1:38765/navigation',data=json.dumps({'view':'month','date':'2026-12-01'}).encode(),headers={'X-RemarkableCalendar-Request':'sync'})
+        with urllib.request.urlopen(request,timeout=2) as response: assert response.status==200
         p.terminate();p.wait(timeout=5)
         # A stale enabled calendar starts one background refresh on launch, even offline.
         with sqlite3.connect(tmp+'/events.sqlite3') as db:
@@ -198,6 +208,7 @@ with tempfile.TemporaryDirectory() as tmp:
         assert get('/health')['ok']
         assert len(get('/week?date=2026-10-26')['events'])==1
         assert get('/settings')['settings']['auto_sync'] is True
+        assert get('/navigation')['navigation']=={'view':'month','date':'2026-12-01'}
         p.terminate();p.wait(timeout=5)
         print('PASS: stale launch starts sync offline without blocking cached events; settings persist after restart')
         # Explicit termination packet also ends the process.

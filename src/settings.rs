@@ -165,7 +165,7 @@ pub fn navigation(db: &Connection) -> Result<Option<Navigation>> {
         .transpose()
 }
 pub fn save_navigation(db: &Connection, state: &Navigation) -> Result<()> {
-    if !["week", "day"].contains(&state.view.as_str()) {
+    if !["week", "day", "month"].contains(&state.view.as_str()) {
         return Err("Choose a supported calendar view".into());
     }
     if crate::date(&state.date)?.to_string() != state.date {

@@ -17,38 +17,61 @@ Column {
             id: previousButton
             anchors.left: parent.left
             icon: "previous"
-            label: toolbar.view === "day" ? "Previous day" : "Previous week"
-            onTriggered: toolbar.view === "day" ? app.shiftDay(-1) : app.shiftWeek(-1)
+            label: toolbar.view === "month" ? "Previous month" : (toolbar.view === "day" ? "Previous day" : "Previous week")
+            onTriggered: toolbar.view === "month" ? app.shiftMonth(-1) : (toolbar.view === "day" ? app.shiftDay(-1) : app.shiftWeek(-1))
         }
         ToolbarButton {
-            id: viewButton
+            id: dayButton
             anchors.left: previousButton.right
-            icon: toolbar.view === "day" ? "week" : "day"
-            label: toolbar.view === "day" ? "Week view" : "Day view"
-            onTriggered: toolbar.view === "day" ? app.showWeek() : app.openToolbarDay()
+            icon: "day"
+            label: "Day view"
+            onTriggered: app.openToolbarDay()
+        }
+        ToolbarButton {
+            id: weekButton
+            anchors.left: dayButton.right
+            icon: "week"
+            label: "Week view"
+            onTriggered: {
+                if (toolbar.view !== "week")
+                    app.showWeek();
+            }
+        }
+        ToolbarButton {
+            id: monthButton
+            anchors.left: weekButton.right
+            icon: "month"
+            label: "Month view"
+            onTriggered: {
+                if (toolbar.view !== "month")
+                    app.openMonth();
+            }
         }
         ToolbarButton {
             id: todayButton
-            anchors.left: viewButton.right
+            anchors.left: monthButton.right
             icon: "today"
             label: "Go to today"
             onTriggered: {
-                if (toolbar.view === "day")
+                if (toolbar.view === "month")
+                    app.openMonth(new Date());
+                else if (toolbar.view === "day")
                     app.loadDay(new Date());
                 else
                     app.selectedDate = new Date();
             }
         }
+        ToolbarTitle {
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: Math.max(0, parent.width - 10 * 64 - 24)
+            text: toolbar.view === "month" ? Qt.formatDate(app.monthDate, "MMMM yyyy") : toolbar.view === "day" ? Qt.formatDate(app.detailDayDate, "ddd MMM d") : Qt.formatDate(app.dayAt(0), "MMM d") + " – " + Qt.formatDate(app.dayAt(6), "MMM d")
+        }
         ToolbarButton {
-            anchors.left: todayButton.right
+            anchors.right: syncButton.left
             icon: "add"
             label: "New event"
             enabled: !app.syncBusy
             onTriggered: app.beginEdit(null)
-        }
-        ToolbarTitle {
-            anchors.horizontalCenter: parent.horizontalCenter
-            text: toolbar.view === "day" ? Qt.formatDate(app.detailDayDate, "ddd MMM d") : Qt.formatDate(app.dayAt(0), "MMM d") + " – " + Qt.formatDate(app.dayAt(6), "MMM d")
         }
         ToolbarButton {
             id: syncButton
@@ -73,8 +96,8 @@ Column {
             id: nextButton
             anchors.right: parent.right
             icon: "next"
-            label: toolbar.view === "day" ? "Next day" : "Next week"
-            onTriggered: toolbar.view === "day" ? app.shiftDay(1) : app.shiftWeek(1)
+            label: toolbar.view === "month" ? "Next month" : (toolbar.view === "day" ? "Next day" : "Next week")
+            onTriggered: toolbar.view === "month" ? app.shiftMonth(1) : (toolbar.view === "day" ? app.shiftDay(1) : app.shiftWeek(1))
         }
     }
     Rectangle {
