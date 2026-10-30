@@ -25,7 +25,7 @@ c.loadMonth=d=>{c.loadedMonth=c.isoDate(d);};
 c.root=c; vm.createContext(c); vm.runInContext(helpers,c);
 c.rememberNavigation(); assert.equal(requests.length,0,'startup must not overwrite saved navigation');
 c.restoreNavigation(); requests.at(-1).respond({navigation:{view:'day',date:'2027-01-02'}});
-assert.equal(c.primaryView,'day'); assert.equal(c.loadedDay,'2027-01-02'); assert.equal(c.weeks,1);
+assert.equal(c.primaryView,'day'); assert.equal(c.loadedDay,'2027-01-02'); assert.equal(c.weeks,undefined,'restoring Day must not load a hidden week');
 c.rememberNavigation(); const first=requests.at(-1);
 assert.deepEqual(JSON.parse(first.body),{view:'day',date:'2027-01-02'});
 c.detailDayDate=new Date(2027,0,3,12); c.rememberNavigation();

@@ -236,9 +236,10 @@ Rectangle {
                 var result=JSON.parse(xhr.responseText)
                 if(xhr.status!==200) throw(result.error || "Could not save change")
                 confirmChange=null;editOpen=false;editField="";editMessage=""
-                root.loadWeek()
+                root.invalidateMonthCache()
+                if(root.primaryView === "week") root.loadWeek()
                 if(root.primaryView === "month") root.loadMonth(root.requestedMonthDate)
-                if(change.operation==="discard") {root.fetchSettings();return}
+                if(change.operation==="discard") {if(primaryView==="day") loadDay(detailDayDate);root.fetchSettings();return}
                 if(change.operation==="delete") {
                     detailsLevel=""
                     if(primaryView==="day") loadDay(detailDayDate)
@@ -542,7 +543,8 @@ Rectangle {
                     syncPoll.restart()
                 } else if (result.state === "succeeded" || result.state === "failed") {
                     // Refresh even after a partial failure: earlier calendars may have committed.
-                    root.loadWeek()
+                    root.invalidateMonthCache()
+                    if(root.primaryView === "week") root.loadWeek()
                     if(root.primaryView === "day") root.loadDay(root.detailDayDate)
                     if(root.primaryView === "month") root.loadMonth(root.requestedMonthDate)
                     root.refreshActiveEvent(result.state==="succeeded" && result.kind!=="calendars")
@@ -623,7 +625,8 @@ Rectangle {
             displayPrefs = draft
             settingsDirty = false
             settingsOpen = false
-            root.loadWeek()
+            root.invalidateMonthCache()
+            if(root.primaryView === "week") root.loadWeek()
             if(root.primaryView === "day") root.loadDay(root.detailDayDate)
             if(root.primaryView === "month") root.loadMonth(root.requestedMonthDate)
             if (draft.selected_ids.length) root.requestSync(true)
@@ -715,7 +718,7 @@ Rectangle {
                     monthDate=new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1, 12)
                 }
                 navigationReady=true; navigationFailures=0
-                loadWeek()
+                if(primaryView==="week") loadWeek()
                 if(primaryView==="day") loadDay(detailDayDate)
                 if(primaryView==="month") loadMonth(monthDate)
             } catch(err) {
@@ -736,10 +739,19 @@ Rectangle {
     }
     property date requestedMonthDate: new Date(monthDate)
     property var monthEvents: []
+    property real monthLoadMs: 0
+    property real monthLayoutMs: 0
+    property string monthPerformance: ""
+    property bool monthPublishing: false
+    property var monthCache: ({})
+    property var monthCacheOrder: []
+    property var monthTextHeights: ({})
+    property int monthTextHeightCount: 0
+    property real monthTextWidth: -1
     property string monthMessage: ""
     property var monthRequest: null
     property int monthSerial: 0
-    readonly property var monthTitleMeasure: monthPage.titleMeasure
+    readonly property var monthFontMetrics: monthPage.fontMetrics
     function cancelMonthRequest() {
         ++monthSerial
         monthDeadline.stop()
@@ -747,49 +759,94 @@ Rectangle {
         if(xhr) xhr.abort()
         monthMessage=""
     }
+    function invalidateMonthCache() {
+        cancelMonthRequest()
+        monthCache={}; monthCacheOrder=[]
+    }
+    function publishMonth(wanted, result) {
+        monthPublishing=true
+        if(result.display) displayPrefs=result.display
+        monthDate=wanted
+        monthEvents=result.events
+        monthPublishing=false
+        rememberNavigation()
+    }
+    function cacheMonth(key, result) {
+        var order=monthCacheOrder.filter(function(item) { return item!==key })
+        order.push(key)
+        monthCache[key]=result
+        while(order.length>3) delete monthCache[order.shift()]
+        monthCacheOrder=order
+    }
     function loadMonth(date) {
         cancelMonthRequest()
         var wanted=new Date(date.getFullYear(),date.getMonth(),1,12)
         requestedMonthDate=wanted
+        var key=isoDate(wanted)
+        if(monthCache[key]) {
+            var cached=monthCache[key]
+            cacheMonth(key,cached)
+            monthLoadMs=0
+            publishMonth(wanted,cached)
+            return
+        }
         var serial=monthSerial
         var xhr=new XMLHttpRequest(); monthRequest=xhr; monthDeadline.restart()
+        var requestStarted=Date.now()
         xhr.onreadystatechange=function() {
             if(xhr.readyState!==XMLHttpRequest.DONE || serial!==monthSerial) return
             monthDeadline.stop(); monthRequest=null
             try {
                 if(xhr.status!==200) throw "Month unavailable · tap Sync to retry"
+                var responseAt=Date.now()
                 var result=JSON.parse(xhr.responseText)
+                var parsedAt=Date.now()
                 var geometry=monthGeometry(wanted)
                 var end=new Date(geometry.start); end.setDate(end.getDate()+geometry.rows*7)
-                if(result.month!==isoDate(wanted) || result.start!==isoDate(geometry.start) || result.end!==isoDate(end) || !Array.isArray(result.events)) throw "Unexpected month response"
-                if(result.display) displayPrefs=result.display
-                monthDate=wanted
-                monthEvents=result.events
-                rememberNavigation()
+                if(result.month!==key || result.start!==isoDate(geometry.start) || result.end!==isoDate(end) || !Array.isArray(result.events)) throw "Unexpected month response"
+                cacheMonth(key,result)
+                monthLoadMs=parsedAt-requestStarted
+                publishMonth(wanted,result)
+                console.warn("Calendar month load: "+result.events.length+" events, request "+(responseAt-requestStarted)+"ms, parse "+(parsedAt-responseAt)+"ms, publish "+(Date.now()-parsedAt)+"ms")
             } catch(err) { monthMessage=String(err); requestedMonthDate=new Date(monthDate) }
         }
-        xhr.open("GET","http://127.0.0.1:38765/month?date="+isoDate(wanted)); xhr.send()
+        xhr.open("GET","http://127.0.0.1:38765/month?date="+key); xhr.send()
+    }
+    function monthEntryHeight(title, width) {
+        if(monthTextWidth!==width) {
+            monthTextWidth=width; monthTextHeights={}; monthTextHeightCount=0
+        }
+        var key="title:"+title
+        if(monthTextHeights[key]!==undefined) return monthTextHeights[key]
+        // Font metrics do not force a hidden Text item through synchronous layout.
+        var lineHeight=Math.max(24,Math.ceil(monthFontMetrics.height))
+        var height=(/[\r\n]/.test(title) || monthFontMetrics.advanceWidth(title)>width) ? lineHeight*2 : lineHeight
+        if(monthTextHeightCount>=512) {monthTextHeights={};monthTextHeightCount=0}
+        monthTextHeights[key]=height; ++monthTextHeightCount
+        return height
     }
     function arrangeMonthEvents(input, width, height) {
         var grouped={}; var result={}
-        monthTitleMeasure.width=Math.max(1,width-27)
         input.forEach(function(event) {
             if(!grouped[event.day]) grouped[event.day]=[]
-            monthTitleMeasure.text=event.title
-            monthTitleMeasure.forceLayout()
-            grouped[event.day].push({id:event.id,title:event.title,color:event.color,height:Math.max(24,Math.ceil(monthTitleMeasure.implicitHeight))})
+            grouped[event.day].push(event)
         })
-        var available=Math.max(0,height-64-8-8)
+        var available=Math.max(0,height-80)
+        var titleWidth=Math.max(1,width-27)
         Object.keys(grouped).forEach(function(day) {
-            var items=grouped[day]; var total=0
-            items.forEach(function(item,index) { total+=item.height+(index ? 6 : 0) })
-            var limit=total>available ? Math.max(0,available-24) : available
-            var entries=[]; var used=0
+            var items=grouped[day]; var entries=[]; var used=0
+            // Stop as soon as the next entry cannot fit. Hidden titles need no text layout.
             for(var i=0;i<items.length;i++) {
                 var gap=entries.length ? 6 : 0
-                if(used+gap+items[i].height>limit) break
-                items[i].y=used+gap
-                entries.push(items[i]); used+=gap+items[i].height
+                if(used+gap+24>available) break
+                var entryHeight=monthEntryHeight(items[i].title,titleWidth)
+                if(used+gap+entryHeight>available) break
+                entries.push({id:items[i].id,title:items[i].title,color:items[i].color,height:entryHeight,y:used+gap})
+                used+=gap+entryHeight
+            }
+            if(entries.length<items.length) {
+                var limit=Math.max(0,available-24)
+                while(entries.length && entries[entries.length-1].y+entries[entries.length-1].height>limit) entries.pop()
             }
             result[day]={entries:entries,hidden:items.length-entries.length}
         })

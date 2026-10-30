@@ -9,3 +9,4 @@ node tests/layout.cjs
 node tests/navigation.cjs
 node tests/month.cjs
 node tests/month-data.cjs
+node tests/month-paint.cjs

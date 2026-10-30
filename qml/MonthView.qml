@@ -3,24 +3,27 @@ import QtQuick
 Item {
     id: page
     required property var app
-    property alias titleMeasure: titleMeasure
+    property alias fontMetrics: monthMetrics
     property var dayLayouts: ({})
     function reflowEvents() {
-        if (app.layoutReady && grid.cellWidth > 0 && grid.rowHeight > 0)
+        if (app.layoutReady && !app.monthPublishing && grid.cellWidth > 0 && grid.rowHeight > 0) {
+            var started = Date.now();
             dayLayouts = app.arrangeMonthEvents(app.monthEvents, grid.cellWidth, grid.rowHeight);
+            page.app.monthLayoutMs = Date.now() - started;
+            console.warn("Calendar month layout: " + app.monthEvents.length + " events, " + (Date.now() - started) + "ms");
+        }
     }
-    Text {
-        id: titleMeasure
-        visible: false
-        textFormat: Text.PlainText
-        wrapMode: Text.Wrap
-        maximumLineCount: 2
-        elide: Text.ElideRight
+    FontMetrics {
+        id: monthMetrics
         font.pixelSize: 20
         font.weight: Font.DemiBold
     }
     Connections {
         target: page.app
+        function onMonthPublishingChanged() {
+            if (!page.app.monthPublishing)
+                page.reflowEvents();
+        }
         function onMonthEventsChanged() {
             page.reflowEvents();
         }
@@ -171,52 +174,15 @@ Item {
                         color: parent.parent.today ? "white" : (parent.parent.inMonth ? "black" : "#777777")
                     }
                 }
-                Item {
-                    x: 8
-                    y: 72
-                    width: parent.width - 16
-                    Repeater {
-                        model: dayCell.eventLayout.entries
-                        delegate: Item {
-                            required property var modelData
-                            y: modelData.y
-                            width: dayCell.width - 16
-                            height: modelData.height
-                            Rectangle {
-                                width: 5
-                                height: parent.height
-                                color: modelData.color
-                            }
-                            Text {
-                                x: 11
-                                width: parent.width - 11
-                                height: parent.height
-                                text: modelData.title
-                                textFormat: Text.PlainText
-                                wrapMode: Text.Wrap
-                                maximumLineCount: 2
-                                elide: Text.ElideRight
-                                font.pixelSize: 20
-                                font.weight: Font.DemiBold
-                                color: "black"
-                            }
-                        }
-                    }
-                }
-                Text {
-                    visible: dayCell.eventLayout.hidden > 0
-                    anchors.right: parent.right
-                    anchors.rightMargin: 8
-                    anchors.bottom: parent.bottom
-                    anchors.bottomMargin: 8
-                    width: parent.width - 16
-                    height: 20
-                    text: "+" + dayCell.eventLayout.hidden + " more"
-                    horizontalAlignment: Text.AlignRight
-                    font.pixelSize: 17
-                    color: "black"
-                }
             }
+        }
+        MonthEventsCanvas {
+            anchors.fill: parent
+            app: page.app
+            layouts: page.dayLayouts
+            gridStart: page.gridStart
+            rowCount: page.rowCount
+            weekWidth: page.weekWidth
         }
         MouseArea {
             anchors.fill: parent

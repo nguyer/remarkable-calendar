@@ -219,6 +219,34 @@ fn event_range(db: &Connection, start: NaiveDate, end: NaiveDate) -> Result<Week
         display: settings::display(db)?,
     })
 }
+#[derive(Serialize)]
+struct MonthEvent {
+    id: String,
+    day: String,
+    title: String,
+    color: String,
+}
+// Month previews deliberately bypass EventDetails and the full-cache weekly path.
+struct MonthSource {
+    id: String,
+    title: String,
+    day: String,
+    start: String,
+    end: String,
+    color: String,
+    end_day: Option<String>,
+}
+fn month_source_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<MonthSource> {
+    Ok(MonthSource {
+        id: row.get(0)?,
+        title: row.get(1)?,
+        day: row.get(2)?,
+        start: row.get(3)?,
+        end: row.get(4)?,
+        color: row.get(5)?,
+        end_day: row.get(6)?,
+    })
+}
 fn month(db: &Connection, d: NaiveDate) -> Result<serde_json::Value> {
     let first = d.with_day(1).ok_or("invalid month")?;
     let next = first
@@ -226,10 +254,53 @@ fn month(db: &Connection, d: NaiveDate) -> Result<serde_json::Value> {
         .ok_or("invalid month end")?;
     let start = monday(first);
     let end = monday(next - Duration::days(1)) + Duration::days(7);
-    let grid = event_range(db, start, end)?;
+    let range = [start.to_string(), end.to_string()];
+    let mut local=db.prepare_cached("SELECT id,title,day,start,end,color,end_day FROM events WHERE COALESCE(end_day,day)>=?1 AND day<?2")?;
+    let mut sources = local
+        .query_map(params![range[0], range[1]], month_source_row)?
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    let mut google=db.prepare_cached("SELECT json_extract(event_json,'$.id'),json_extract(event_json,'$.title'),
+        json_extract(event_json,'$.day'),json_extract(event_json,'$.start'),json_extract(event_json,'$.end'),
+        json_extract(event_json,'$.color'),json_extract(event_json,'$.end_day')
+        FROM google_cache WHERE json_extract(event_json,'$.day')<?2
+        AND COALESCE(json_extract(event_json,'$.end_day'),json_extract(event_json,'$.day'))>=?1
+        AND NOT EXISTS (SELECT 1 FROM calendar_preferences p WHERE p.id=google_cache.calendar_id AND p.enabled=0)")?;
+    sources.extend(
+        google
+            .query_map(params![range[0], range[1]], month_source_row)?
+            .collect::<std::result::Result<Vec<_>, _>>()?,
+    );
+    let mut segments = Vec::new();
+    for source in sources {
+        let first_day = date(&source.day)?;
+        let last_day = date(source.end_day.as_deref().unwrap_or(&source.day))?;
+        let mut day = first_day.max(start);
+        while day <= last_day && day < end {
+            if day == last_day && day > first_day && source.end == "00:00" {
+                break;
+            }
+            let time = if day > first_day {
+                "00:00".to_string()
+            } else {
+                source.start.clone()
+            };
+            segments.push((
+                time,
+                MonthEvent {
+                    id: source.id.clone(),
+                    day: day.to_string(),
+                    title: source.title.clone(),
+                    color: source.color.clone(),
+                },
+            ));
+            day += Duration::days(1);
+        }
+    }
+    segments.sort_by(|a, b| (&a.1.day, &a.0, &a.1.id).cmp(&(&b.1.day, &b.0, &b.1.id)));
+    let events: Vec<_> = segments.into_iter().map(|(_, event)| event).collect();
     Ok(
-        serde_json::json!({"month":first.to_string(),"start":start.to_string(),"end":end.to_string(),
-        "events":grid.events,"google":grid.google,"display":grid.display}),
+        serde_json::json!({"month":first.to_string(),"start":range[0],"end":range[1],
+        "events":events,"display":settings::display(db)?}),
     )
 }
 fn route(db: &Connection, method: &str, path: &str) -> (&'static str, String) {
@@ -591,13 +662,42 @@ mod tests {
         assert_eq!(rows.len(), 5);
         assert_eq!(rows[0]["day"], "2026-10-31");
         assert_eq!(rows[1]["day"], "2026-11-01");
-        assert_eq!(rows[1]["details"]["start_day"], "2026-10-31");
-        assert_eq!(rows[2]["all_day"], true);
+        assert!(rows.iter().all(|row| row.as_object().unwrap().len() == 4));
+        assert!(rows[1].get("details").is_none());
+        assert_eq!(rows[2]["title"], "Trip");
         assert_eq!(rows[4]["id"], "last");
         let february = month(&db, date("2021-02-01")?)?;
         assert_eq!(february["start"], "2021-02-01");
         assert_eq!(february["end"], "2021-03-01");
         assert!(february["events"].as_array().unwrap().is_empty());
+        // Compact Google previews must match the full weekly segmentation and visibility rules.
+        let mut cached = events[0].clone();
+        cached.id = "google:work:overnight".into();
+        cached.details = Some(EventDetails {
+            description: "Large description".repeat(4096),
+            pending: true,
+            ..Default::default()
+        });
+        db.execute(
+            "INSERT INTO google_cache VALUES ('work',?1,?2)",
+            params![cached.id, serde_json::to_string(&cached)?],
+        )?;
+        db.execute("INSERT INTO calendar_preferences (id,name,color,enabled) VALUES ('work','Work','#123456',1)",[])?;
+        for enabled in [1, 0] {
+            db.execute(
+                "UPDATE calendar_preferences SET enabled=?1 WHERE id='work'",
+                [enabled],
+            )?;
+            let compact = month(&db, date("2026-11-01")?)?;
+            let expected: Vec<_> = event_range(&db, date("2026-10-26")?, date("2026-12-07")?)?
+                .events
+                .into_iter()
+                .map(|e| serde_json::json!({"id":e.id,"day":e.day,"title":e.title,"color":e.color}))
+                .collect();
+            assert_eq!(compact["events"], serde_json::json!(expected));
+            assert!(serde_json::to_vec(&compact)?.len() < 8192);
+        }
+
         assert_eq!(
             route(&db, "GET", "/month?date=2026-02-30").0,
             "400 Bad Request"

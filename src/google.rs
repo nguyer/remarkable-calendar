@@ -109,6 +109,12 @@ fn fetch_pages(
 pub fn init(db: &Connection) -> Result<()> {
     db.execute_batch("CREATE TABLE IF NOT EXISTS google_cache (calendar_id TEXT NOT NULL, event_id TEXT NOT NULL, event_json TEXT NOT NULL, PRIMARY KEY(calendar_id,event_id));
         CREATE TABLE IF NOT EXISTS google_sync (calendar_id TEXT PRIMARY KEY, time_min TEXT NOT NULL, time_max TEXT NOT NULL, timezone TEXT NOT NULL, synced_at TEXT NOT NULL);")?;
+    db.execute_batch(
+        "CREATE INDEX IF NOT EXISTS google_cache_date_range ON google_cache (
+        json_extract(event_json,'$.day'),
+        COALESCE(json_extract(event_json,'$.end_day'),json_extract(event_json,'$.day'))
+    );",
+    )?;
     crate::settings::init(db)?;
     crate::edits::init(db)?;
     Ok(())
