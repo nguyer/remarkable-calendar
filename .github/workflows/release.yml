@@ -1,0 +1,158 @@
+name: Build and package
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: package-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt,clippy
+          rustup default stable
+      - name: Test
+        run: |
+          ./scripts/test.sh
+          cargo fmt --check
+          cargo clippy --locked --all-targets -- -D warnings
+
+  package:
+    needs: test
+    env:
+      VBUILD_KEY_NAME: ${{ github.ref_type == 'tag' && 'remarkable-calendar' || 'remarkable-calendar-dev' }}
+    # Ubuntu 22.04 keeps the cross-linker's glibc baseline at 2.35.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu qt6-base-dev-tools
+          rustup toolchain install stable --profile minimal --target aarch64-unknown-linux-gnu
+          rustup default stable
+      - name: Validate tag and signing configuration
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          SIGNING_KEY: ${{ github.ref_type == 'tag' && secrets.VELLUM_SIGNING_KEY || '' }}
+        run: |
+          python3 - <<'PY'
+          import os, tomllib
+          version = tomllib.load(open('Cargo.toml', 'rb'))['package']['version']
+          if os.environ['REF_TYPE'] == 'tag':
+              if os.environ['REF_NAME'] != 'v' + version:
+                  raise SystemExit('The tag must equal v + the Cargo.toml version')
+              if not os.environ['SIGNING_KEY'].strip():
+                  raise SystemExit('Set VELLUM_SIGNING_KEY before building a tagged release')
+          PY
+      - name: Build backend and UI
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+          CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
+          RCC: /usr/lib/qt6/libexec/rcc
+        run: |
+          ./scripts/build-backend.sh
+          ./scripts/build-ui.sh
+          aarch64-linux-gnu-readelf --version-info dist/remarkable-calendar/backend/entry > dist/backend-versions.txt
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          versions = re.findall(r'GLIBC_([0-9]+)\.([0-9]+)', Path('dist/backend-versions.txt').read_text())
+          if not versions or max(tuple(map(int, v)) for v in versions) > (2, 35):
+              raise SystemExit('Unexpected backend glibc requirements; review the release toolchain')
+          PY
+      - name: Assemble release bundle
+        env:
+          RELEASE_REPOSITORY: ${{ github.repository }}
+        run: |
+          export SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
+          python3 scripts/package-release.py --repository "$RELEASE_REPOSITORY"
+          python3 - <<'PY'
+          import json, os, subprocess
+          from pathlib import Path
+          info = {'commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
+                  'rust': subprocess.check_output(['rustc', '--version'], text=True).strip(),
+                  'target': 'aarch64-unknown-linux-gnu', 'glibc_maximum': '2.35',
+                  'run': os.environ['GITHUB_SERVER_URL'] + '/' + os.environ['GITHUB_REPOSITORY'] + '/actions/runs/' + os.environ['GITHUB_RUN_ID']}
+          Path('dist/release/BUILD-INFO.json').write_text(json.dumps(info, indent=2) + '\n')
+          PY
+      - name: Install pinned VBuild
+        run: |
+          mkdir -p "$RUNNER_TEMP/vbuild"
+          curl --fail --location --retry 3 https://github.com/Eeems/vbuild/releases/download/0.0.36/vbuild-x86_64-glibc -o "$RUNNER_TEMP/vbuild/vbuild"
+          echo "26d2185dc9599893d80fa1d91ba92480e99b3beb0de8b4cad1ff12224c59a74f  $RUNNER_TEMP/vbuild/vbuild" | sha256sum --check
+          chmod 755 "$RUNNER_TEMP/vbuild/vbuild"
+          echo "$RUNNER_TEMP/vbuild" >> "$GITHUB_PATH"
+      - name: Configure package signing
+        env:
+          SIGNING_KEY: ${{ github.ref_type == 'tag' && secrets.VELLUM_SIGNING_KEY || '' }}
+        run: |
+          umask 077
+          mkdir -p "$HOME/.config/vbuild"
+          if [ -n "$SIGNING_KEY" ]; then
+            printf '%s\n' "$SIGNING_KEY" > "$HOME/.config/vbuild/$VBUILD_KEY_NAME.rsa"
+          else
+            # Non-release builds can be tested with a disposable development key.
+            openssl genrsa -out "$HOME/.config/vbuild/$VBUILD_KEY_NAME.rsa" 4096
+          fi
+          openssl rsa -in "$HOME/.config/vbuild/$VBUILD_KEY_NAME.rsa" -pubout -out "$HOME/.config/vbuild/$VBUILD_KEY_NAME.rsa.pub"
+      - name: Build signed Vellum package
+        run: |
+          export SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
+          ./scripts/build-vellum.sh
+      - name: Remove private signing key
+        if: always()
+        run: rm -f "$HOME/.config/vbuild/$VBUILD_KEY_NAME.rsa"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: remarkable-calendar-aarch64
+          if-no-files-found: error
+          path: |
+            dist/release/*.tar.gz
+            dist/release/*.apk
+            dist/release/*.rsa.pub
+            dist/release/VELBUILD
+            dist/release/SHA256SUMS
+            dist/release/BUILD-INFO.json
+
+  draft-release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: package
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: remarkable-calendar-aarch64
+          path: release
+      - name: Create draft release for tablet validation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" release/* --draft --verify-tag \
+            --title "reMarkable Calendar $RELEASE_TAG" --notes-file packaging/release-notes.md

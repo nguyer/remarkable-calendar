@@ -8,3 +8,7 @@ client_secret*.json
 credentials*.json
 
 __pycache__/
+
+# Package signing keys must never be committed.
+*.rsa
+*.pem

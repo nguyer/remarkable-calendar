@@ -30,10 +30,16 @@ The app appears as **Calendar** in AppLoad. It was designed for **reMarkable Pap
 |   ☑    | Background sync              | Sync manually or refresh stale data when launching the app.        |
 | ☑ | Month overview | Tap ISO week numbers or dates to open their week or day; swipe between months. |
 |   ☐    | Year overview                | Planned.                                                           |
-|   ☐    | Vellum package               | Planned.                                                           |
+|   ☐    | Vellum/reManager distribution | Packaging and automated builds are ready for testing; catalog listing is pending. |
 |   ☐    | Easy OAuth onboarding        | Planned.                                                           |
 
 Defaults: **12-hour time**, a fixed **7am–9pm** day view, and **one month back / six months ahead** of cached events. Editing a whole recurring series, managing guests, and continuous scheduled sync are not implemented.
+
+## Prebuilt packages
+
+GitHub Actions builds ARM64 app bundles and signed Vellum packages for Paper Pro and Move. Version tags create draft releases for testing before publication. **Calendar is not yet listed in the Vellum/reManager catalog.** Google sign-in still uses the setup steps below.
+
+For testing a prebuilt package, migration from a source installation, or maintaining releases, see the [packaging guide](docs/packaging.md). The source-install instructions remain available below.
 
 ## Install from source
 
