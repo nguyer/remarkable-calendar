@@ -10,3 +10,4 @@ node tests/navigation.cjs
 node tests/month.cjs
 node tests/month-data.cjs
 node tests/month-paint.cjs
+python3 tests/packaging.py

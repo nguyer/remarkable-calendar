@@ -1,0 +1,43 @@
+maintainer="Nicko Guyer <nguyer@gmail.com>"
+pkgname=remarkable-calendar
+pkgver=@VERSION@
+pkgrel=0
+upstream_author="nguyer"
+category="apps"
+pkgdesc="Offline-capable Google Calendar app for reMarkable Paper Pro and Move"
+url="https://github.com/@REPOSITORY@"
+arch="aarch64"
+license="MIT"
+depends="appload !rm1 !rm2 !rmppure"
+readmeurl="https://raw.githubusercontent.com/@REPOSITORY@/v$pkgver/README.md"
+options="!check !fhs !strip !tracedeps"
+source="@SOURCE@"
+builddir="$srcdir/remarkable-calendar"
+
+package() {
+	local appdir="$pkgdir/home/root/xovi/exthome/appload/$pkgname"
+	install -Dm755 "$builddir/backend/entry" "$appdir/backend/entry"
+	for file in manifest.json resources.rcc icon.png; do
+		install -Dm644 "$builddir/$file" "$appdir/$file"
+	done
+	install -Dm644 "$builddir/LICENSE.md" \
+		"$pkgdir/home/root/.vellum/licenses/$pkgname/LICENSE"
+	printf '%s\n' "$url/tree/v$pkgver" > \
+		"$pkgdir/home/root/.vellum/licenses/$pkgname/SOURCES"
+}
+
+postinstall() {
+	echo "Select AppLoad > Reload, then open Calendar. Google sign-in is configured separately; see the README."
+}
+
+postupgrade() {
+	postinstall
+}
+
+postdeinstall() {
+	if [ "${VELLUM_PURGE:-0}" = "1" ]; then
+		rm -rf /home/root/.config/remarkable-calendar /home/root/.local/share/remarkable-calendar
+	fi
+}
+
+sha512sums="@SHA512@  @ARCHIVE@"

@@ -203,3 +203,7 @@ Startup and post-sync refreshes now load only the active primary calendar view, 
 `MonthEventsCanvas.qml` draws all event color lines, wrapped titles, and overflow labels into one transparent image layer. The existing grid/date items and gesture hit testing remain separate. This avoids constructing a QML Text/Rectangle subtree for every visible event. Wrapped lines are cached (up to 512 entries) and clipped to each day's preview area. `tests/month-paint.cjs` checks wrapping, ellipsis, line caching, colors, overflow labels, and paint bounds using the actual drawing helpers with a recording context.
 
 The temporary performance readout has been removed from Settings. Timing messages remain available in application logs; they exclude the final display refresh and should not be presented as measured eInk latency. The user confirmed that the single-layer month renderer is substantially faster on the tablet.
+
+## Automated releases
+
+See [Releases and Vellum packaging](packaging.md) for the GitHub Actions workflow, signing-key setup, version tags, local package builds, and tablet validation. The workflow builds the backend and QML from source, produces a signed ARM64 Vellum package and app bundle, and creates a draft release for version tags. It does not submit to the Vellum catalog automatically.

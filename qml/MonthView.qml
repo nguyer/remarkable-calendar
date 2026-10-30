@@ -169,8 +169,8 @@ Item {
                     Text {
                         anchors.centerIn: parent
                         text: parent.parent.date.getDate()
-                        font.pixelSize: 34
-                        font.bold: parent.parent.today
+                        font.pixelSize: 30
+                        font.bold: true
                         color: parent.parent.today ? "white" : (parent.parent.inMonth ? "black" : "#777777")
                     }
                 }
