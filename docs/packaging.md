@@ -6,7 +6,7 @@ reManager browses the Vellum catalog, so a Vellum catalog entry also makes Calen
 
 ## GitHub Actions
 
-The **Build and package** workflow runs on pushes to `main` and `feature/packaging`, pull requests, version tags, and manual runs from the Actions tab. It runs the existing tests plus packaging tests, then builds the Rust ARM64 backend and the QML resources from source. It does not use `prebuilt-ui/`.
+The **Build and package** workflow runs on pull requests, version tags, and manual runs from the Actions tab. Branch pushes do not trigger a separate run; commits added to an open pull request update its checks. It runs the existing tests plus packaging tests, then builds the Rust ARM64 backend and the QML resources from source. It does not use `prebuilt-ui/`.
 
 Every successful run provides a `remarkable-calendar-aarch64` artifact containing:
 
@@ -19,7 +19,7 @@ Every successful run provides a `remarkable-calendar-aarch64` artifact containin
 | `SHA256SUMS` | Checksums of the release files |
 | `BUILD-INFO.json` | Source commit, Rust version, build run, and glibc limit |
 
-The backend is linked on Ubuntu 22.04 with the ARM64 GNU cross compiler. CI rejects a binary requiring glibc newer than 2.35. This is a compiler baseline, not proof of compatibility with all firmware: test on each supported tablet before publishing. AppLoad/Vellum resolves its own firmware dependencies.
+The backend is linked on Ubuntu 22.04 with the ARM64 GNU cross compiler. CI rejects a binary requiring glibc newer than 2.35. VBuild packaging runs separately on Ubuntu 24.04 because its executable requires glibc 2.38. The already-built app bundle is transferred between jobs and is not recompiled on that newer runner. This is a compiler baseline, not proof of compatibility with all firmware: test on each supported tablet before publishing. AppLoad/Vellum resolves its own firmware dependencies.
 
 ### One-time signing setup
 

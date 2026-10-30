@@ -2,7 +2,6 @@ name: Build and package
 
 on:
   push:
-    branches: [main, feature/packaging]
     tags: ['v*']
   pull_request:
   workflow_dispatch:
@@ -35,10 +34,8 @@ jobs:
           cargo fmt --check
           cargo clippy --locked --all-targets -- -D warnings
 
-  package:
+  build:
     needs: test
-    env:
-      VBUILD_KEY_NAME: ${{ github.ref_type == 'tag' && 'remarkable-calendar' || 'remarkable-calendar-dev' }}
     # Ubuntu 22.04 keeps the cross-linker's glibc baseline at 2.35.
     runs-on: ubuntu-22.04
     steps:
@@ -98,6 +95,28 @@ jobs:
                   'run': os.environ['GITHUB_SERVER_URL'] + '/' + os.environ['GITHUB_REPOSITORY'] + '/actions/runs/' + os.environ['GITHUB_RUN_ID']}
           Path('dist/release/BUILD-INFO.json').write_text(json.dumps(info, indent=2) + '\n')
           PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: remarkable-calendar-package-inputs
+          if-no-files-found: error
+          path: dist/release/
+
+  package:
+    needs: build
+    # VBuild 0.0.36 requires glibc 2.38; it cannot run on Ubuntu 22.04.
+    # Package the existing binary here without recompiling or changing its baseline.
+    runs-on: ubuntu-24.04
+    env:
+      VBUILD_KEY_NAME: ${{ github.ref_type == 'tag' && 'remarkable-calendar' || 'remarkable-calendar-dev' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: remarkable-calendar-package-inputs
+          path: dist/release
       - name: Install pinned VBuild
         run: |
           mkdir -p "$RUNNER_TEMP/vbuild"
