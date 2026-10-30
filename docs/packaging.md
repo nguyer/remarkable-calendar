@@ -6,7 +6,7 @@ reManager browses the Vellum catalog, so a Vellum catalog entry also makes Calen
 
 ## GitHub Actions
 
-The **Build and package** workflow runs on pushes to `main`, pull requests, version tags, and manual runs from the Actions tab. It runs the existing tests plus packaging tests, then builds the Rust ARM64 backend and the QML resources from source. It does not use `prebuilt-ui/`.
+The **Build and package** workflow runs on pushes to `main` and `feature/packaging`, pull requests, version tags, and manual runs from the Actions tab. It runs the existing tests plus packaging tests, then builds the Rust ARM64 backend and the QML resources from source. It does not use `prebuilt-ui/`.
 
 Every successful run provides a `remarkable-calendar-aarch64` artifact containing:
 
