@@ -14,7 +14,7 @@ The app appears as **Calendar** in AppLoad. It was designed for **reMarkable Pap
 
 | Status | Feature                      | Description                                                        |
 | :----: | ---------------------------- | ------------------------------------------------------------------ |
-|   ☑    | Weekly overview              | Seven days with morning/afternoon columns and a today indicator.   |
+|   ☑    | Weekly overview              | Portrait morning/afternoon lists, or seven hourly day columns in landscape, with a today indicator. |
 |   ☑    | Day schedule                 | Hourly timeline with a separate all-day events area.               |
 |   ☑    | Swipe navigation             | Swipe between months, weeks, or days, or use the arrows and Today button.   |
 |   ☑    | Event details                | Read times, location, description, and calendar information.       |
