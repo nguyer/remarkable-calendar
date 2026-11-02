@@ -45,17 +45,13 @@ If you used `google-new.json`, replace only the **computer-side** filename in th
 
 ## Choose the display timezone
 
-Calendar uses one display timezone for all calendars. On a fresh installation it defaults to UTC. The timezone is shown in Settings, but there is currently no timezone picker.
+Open **Settings**, tap the current **Time zone**, and search for a city or region using the on-screen letters. For example, search `Guatemala` and select `America/Guatemala`. The picker works offline and lists timezones supported by the tablet's built-in timezone database, including daylight-saving rules.
 
-For a **fresh installation, before saving settings**, initialize your preferred timezone with a first sync. Keep Calendar closed and connect the tablet to Wi-Fi. This example syncs the primary calendar using New York time:
+Tap a result to return to Settings, then **Save & sync** to apply it. Google event times update when the sync completes; if offline, cached times retain the previous timezone until the next successful sync. Local events keep their entered clock times. Calendar uses this display timezone for all selected Google calendars.
 
-```sh
-ssh root@10.11.99.1 '/home/root/xovi/exthome/appload/remarkable-calendar/backend/entry google-sync 2026-10-01 2027-05-01 America/New_York'
-```
+### Change an already saved timezone
 
-Replace the dates with a range around today and replace `America/New_York` with your IANA timezone, such as `America/Guatemala` or `Europe/London`. The ending date is exclusive. The app uses this initial timezone when creating its settings; subsequent in-app syncs use the rolling window selected in Settings.
-
-If you have already saved settings, a command-line sync does not overwrite their timezone. Existing configurations can be changed through the [local settings interface](development.md#local-http-interface); this is currently an advanced setup step. Do not run a command-line sync while an in-app sync is running.
+Use **Settings → Time zone** at any time, choose a new zone, and tap **Save & sync**. No database reset, terminal command, or Google reauthorization is required.
 
 ## Select calendars and sync
 

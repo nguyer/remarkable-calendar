@@ -308,6 +308,14 @@ fn route(db: &Connection, method: &str, path: &str) -> (&'static str, String) {
     if method != "GET" {
         return ("405 Method Not Allowed", r#"{"error":"GET only"}"#.into());
     }
+    if path == "/timezones" {
+        let mut zones: Vec<_> = chrono_tz::TZ_VARIANTS
+            .iter()
+            .map(ToString::to_string)
+            .collect();
+        zones.sort();
+        return ("200 OK", serde_json::json!({"timezones":zones}).to_string());
+    }
     if path == "/google/status" {
         return match google::status(db) {
             Ok(status) => ("200 OK", status.to_string()),

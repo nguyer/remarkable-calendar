@@ -7,6 +7,10 @@ def get(path):
     with urllib.request.urlopen('http://127.0.0.1:38765'+path,timeout=2) as r: return json.load(r)
 def navigation_checks():
     assert get('/navigation') == {'navigation':None}
+    zones=get('/timezones')['timezones']
+    assert zones==sorted(set(zones))
+    assert 'UTC' in zones and 'America/Guatemala' in zones and 'America/New_York' in zones
+
     connection_url='http://127.0.0.1:38765/google/connect'
     try:
         urllib.request.urlopen(connection_url,timeout=2)

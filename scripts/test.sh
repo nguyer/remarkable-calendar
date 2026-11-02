@@ -13,3 +13,4 @@ node tests/month-paint.cjs
 python3 tests/packaging.py
 node --test services/google-onboarding/test/*.test.mjs
 node tests/onboarding.cjs
+node tests/timezones.cjs

@@ -46,10 +46,15 @@ Rectangle {
             font.pixelSize: 20
             color: "black"
         }
-        Text {
-            text: app.settingsDraft ? "Display timezone: " + app.settingsDraft.timezone : ""
-            font.pixelSize: 20
-            color: "black"
+        Item {
+            width:parent.width; height:54
+            Text { anchors.left:parent.left; anchors.verticalCenter:parent.verticalCenter; text:"Time zone"; font.pixelSize:23; color:"black" }
+            Rectangle {
+                x:160; width:parent.width-160; height:54
+                color:"white"; border.color:"black"; border.width:2
+                Text { x:12; width:parent.width-24; anchors.verticalCenter:parent.verticalCenter; font.pixelSize:21; font.bold:true; color:"black"; elide:Text.ElideRight; text:app.settingsDraft ? app.settingsDraft.timezone : "Loading…"; textFormat:Text.PlainText }
+                MouseArea { anchors.fill:parent; enabled:!!app.settingsDraft && !app.settingsLoading && !app.syncBusy; onClicked:app.openTimezonePicker() }
+            }
         }
         Row {
             spacing: 12
