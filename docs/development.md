@@ -211,3 +211,13 @@ See [Releases and Vellum packaging](packaging.md) for the GitHub Actions workflo
 ## Google phone onboarding service
 
 `services/google-onboarding/` contains the Cloudflare Worker, D1 schema, phone pages, pairing/token-renewal protocol, and tests for future QR onboarding. See its [service guide](../services/google-onboarding/README.md). The tablet now uses `src/onboarding.rs` and `qml/GoogleConnect.qml` for background pairing, a QR display, and explicit account confirmation. Relay credentials use the trusted configured service origin; Desktop OAuth credentials continue to refresh directly with Google. The `/google/connect` API requires the native mutation header even for status reads, and never exposes credential grants or polling secrets. See the Google guide for device testing.
+
+## Rotation and sizing
+
+The manifest enables `supportsScaling: true` and `supportsRotation: true`, with `aspectRatio: auto` and `width: auto`. AppLoad uses its resizable QML loader rather than scaling a fixed Move canvas. Calendar chooses the landscape week layout when its available width exceeds its height. Rotation was verified on-device; the temporary diagnostic overlay and logging have been removed.
+
+## Landscape week schedule
+
+The primary week screen selects `LandscapeWeekView.qml` when the root is wider than tall; the existing portrait week view remains available when upright. It uses the same weekly event response and shared toolbar, so rotation does not fetch a separate calendar or change the saved navigation state. Monday–Sunday appear as seven equal day columns with a shared hour gutter, today highlight, all-day band, and hourly event blocks. Date labels open a day, event blocks open details with week return navigation, and horizontal swipes change weeks.
+
+The landscape timeline follows the day schedule's fixed start/end hours or shared 24-hour vertical scrolling preference. `scheduleEvents` now accepts optional geometry and minimum block height; day view keeps its existing defaults. The all-day band shows up to three events per day and an overflow link to the full day. Its height is computed directly from source events, independently of timeline geometry to avoid a binding loop. `tests/landscape-week.cjs` checks grouping, clipping, overlap lanes, hit testing, and input preservation.

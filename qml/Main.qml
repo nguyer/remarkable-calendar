@@ -24,6 +24,7 @@ Rectangle {
     property int syncFailures: 0
     readonly property color todayHighlight: "#74d2e8"
     readonly property int toolbarHeight: 84
+    readonly property bool landscape: width > height
     readonly property int hourHeight: 120
     property var displayPrefs: ({time_format:"12h",day_scroll:false,day_start:420,day_end:1260})
     readonly property var dayGeometryState: dayGeometry()
@@ -311,14 +312,15 @@ Rectangle {
         var delta=Math.round((monday(today).getTime()-start.getTime())/86400000)
         openDay(delta===0 ? (today.getDay()+6)%7 : 0)
     }
-    function scheduleEvents(input) {
-        var g=dayGeometry()
+    function scheduleEvents(input, geometry, minimumHeight) {
+        var g=geometry || dayGeometry()
+        var minimum=typeof minimumHeight === "number" ? minimumHeight : 64
         var timed = input.filter(function(e) { return !e.allDay }).map(function(e) {
             var start = Number(e.start.slice(0,2))*60 + Number(e.start.slice(3,5))
             var endText = e.end || e.time.split("–")[1]
             var end = endText ? Number(endText.slice(0,2))*60 + Number(endText.slice(3,5)) : start+60
             var visibleStart=Math.max(start,g.start)
-            var renderEnd=Math.max(end,visibleStart+64/g.scale)
+            var renderEnd=Math.max(end,visibleStart+minimum/g.scale)
             if (!g.scroll) renderEnd=Math.min(g.end,renderEnd)
             return {event:e,startMinute:start,endMinute:end,viewStart:visibleStart,renderEnd:renderEnd,lane:0,lanes:1}
         }).filter(function(e) { return e.endMinute>g.start && e.startMinute<g.end }).sort(function(a,b) { return a.startMinute-b.startMinute || a.endMinute-b.endMinute })
@@ -877,7 +879,8 @@ Rectangle {
         settingsOpen = false
     }
 
-    WeekView { id: weekPage; app: root; anchors.fill: parent; visible: root.primaryView === "week" }
+    WeekView { id: weekPage; app: root; anchors.fill: parent; visible: root.primaryView === "week" && !root.landscape }
+    LandscapeWeekView { app: root; anchors.fill: parent; visible: root.primaryView === "week" && root.landscape }
     DayPage { id: dayPage; app: root; anchors.fill: parent; visible: root.primaryView === "day" }
     MonthView { id: monthPage; app: root; anchors.fill: parent; visible: root.primaryView === "month" }
     function openTimezonePicker() { timezonePicker.show() }

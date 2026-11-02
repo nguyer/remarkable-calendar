@@ -1,0 +1,33 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const main=fs.readFileSync('qml/Main.qml','utf8');
+const view=fs.readFileSync('qml/LandscapeWeekView.qml','utf8');
+const context={dayGeometry(){throw new Error('Landscape must supply its own geometry')},app:{}};
+vm.createContext(context);
+vm.runInContext(main.slice(main.indexOf('    function scheduleEvents('),main.indexOf('    function cancelDayRequest(')),context);
+context.app.scheduleEvents=context.scheduleEvents;
+vm.runInContext(view.slice(view.indexOf('    function maximumAllDay('),view.indexOf('    component WeekGestureArea:')),context);
+const event=(id,offset,start,end,allDay=false)=>({id,offset,start,end,time:start+'–'+end,title:id,allDay,color:'#112233'});
+const events=[event('morning',0,'09:00','10:00'),event('overlap',0,'09:30','10:30'),
+ event('tuesday',1,'11:00','12:00'),event('short',2,'14:00','14:05'),event('early',3,'06:00','08:00'),
+ event('late',4,'21:00','22:00'),event('sunday',6,'18:00','19:00')];
+for(let i=0;i<4;i++)events.push(event('all-day-'+i,5,'00:00','24:00',true));
+const geometry={start:420,end:1260,scale:1,scroll:false};
+const before=JSON.stringify(events);
+const columns=context.buildColumns(events,geometry);
+assert.equal(columns.length,7);assert.equal(context.maximumAllDay(events),4);
+assert.equal(columns[5].allDay.length,4);assert.equal(columns[5].schedule.length,0);
+assert.equal(columns[4].schedule.length,0);assert.equal(columns[3].schedule[0].viewStart,420);
+assert.equal(columns[2].schedule[0].renderEnd-columns[2].schedule[0].viewStart,44);
+assert.equal(columns[0].schedule[0].lanes,2);assert.equal(columns[0].schedule[1].lanes,2);
+assert.equal(context.timedHit(columns,0,20,580,200).id,'morning');
+assert.equal(context.timedHit(columns,0,120,580,200).id,'overlap');
+assert.equal(context.timedHit(columns,1,20,700,200).id,'tuesday');
+assert.equal(context.timedHit(columns,6,20,1100,200).id,'sunday');
+assert.equal(context.timedHit(columns,-1,20,580,200),null);
+assert.equal(context.timedHit(columns,7,20,580,200),null);
+assert.equal(context.timedHit(columns,0,199,580,200),null);
+assert.equal(context.timedHit(columns,0,20,650,200),null);
+const full=context.buildColumns(events,{start:0,end:1440,scale:2,scroll:true});
+assert.equal(full[4].schedule[0].event.id,'late');assert.equal(full[3].schedule[0].viewStart,360);
+assert.equal(JSON.stringify(events),before);
+console.log('PASS: seven-day landscape grouping, all-day band, hour bounds, minimum event height, overlap lanes, hit tests, and shared scrolling geometry');

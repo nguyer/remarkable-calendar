@@ -3,7 +3,9 @@
   "name": "Calendar",
   "loadsBackend": true,
   "entry": "/qml/Main.qml",
-  "supportsScaling": false,
+  "supportsScaling": true,
   "canHaveMultipleFrontends": false,
-  "aspectRatio": "move"
+  "aspectRatio": "auto",
+  "supportsRotation": true,
+  "width": "auto"
 }
