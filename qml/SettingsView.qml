@@ -251,6 +251,12 @@ Rectangle {
                 }
             }
         }
+        SettingsAction {
+            width: 300
+            label: "Connect Google"
+            enabled: !app.syncBusy
+            onTriggered: app.openGoogleConnect()
+        }
         Row {
             spacing: 16
             SettingsAction {

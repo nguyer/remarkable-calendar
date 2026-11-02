@@ -12,3 +12,10 @@ __pycache__/
 # Package signing keys must never be committed.
 *.rsa
 *.pem
+
+# Local Cloudflare configuration and dependencies.
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+.wrangler/
+node_modules/

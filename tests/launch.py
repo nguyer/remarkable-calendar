@@ -7,6 +7,22 @@ def get(path):
     with urllib.request.urlopen('http://127.0.0.1:38765'+path,timeout=2) as r: return json.load(r)
 def navigation_checks():
     assert get('/navigation') == {'navigation':None}
+    connection_url='http://127.0.0.1:38765/google/connect'
+    try:
+        urllib.request.urlopen(connection_url,timeout=2)
+        raise AssertionError('Connection status needs the native request header')
+    except urllib.error.HTTPError as error: assert error.code==403
+    headers={'X-RemarkableCalendar-Request':'sync','Content-Type':'application/json'}
+    with urllib.request.urlopen(urllib.request.Request(connection_url,headers=headers),timeout=2) as response:
+        status=json.load(response)
+        assert status['state']=='idle'
+        assert 'grant' not in status and 'poll_secret' not in status
+    for action in ['cancel','unknown']:
+        request=urllib.request.Request(connection_url,data=json.dumps({'action':action}).encode(),headers=headers)
+        try:
+            with urllib.request.urlopen(request,timeout=2) as response: assert action=='cancel' and response.status==200
+        except urllib.error.HTTPError as error: assert action=='unknown' and error.code==400
+
     october=get('/month?date=2026-10-29')
     assert october['month']=='2026-10-01' and october['start']=='2026-09-28' and october['end']=='2026-11-02'
     assert any(e['id']=='planning-2026-10-26' for e in october['events'])

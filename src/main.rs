@@ -12,6 +12,7 @@ use std::{
 mod edits;
 mod google;
 mod lifecycle;
+mod onboarding;
 mod settings;
 mod sync_job;
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
@@ -339,7 +340,12 @@ fn route(db: &Connection, method: &str, path: &str) -> (&'static str, String) {
     }
     ("404 Not Found", r#"{"error":"not found"}"#.into())
 }
-fn respond(db: &Connection, job: &sync_job::SyncJob, mut stream: TcpStream) -> Result<()> {
+fn respond(
+    db: &Connection,
+    job: &sync_job::SyncJob,
+    connect: &onboarding::Onboarding,
+    mut stream: TcpStream,
+) -> Result<()> {
     stream.set_read_timeout(Some(std::time::Duration::from_secs(2)))?;
     stream.set_write_timeout(Some(std::time::Duration::from_secs(2)))?;
     let mut req = Vec::new();
@@ -371,7 +377,7 @@ fn respond(db: &Connection, job: &sync_job::SyncJob, mut stream: TcpStream) -> R
         Ok(length) if length.unwrap_or(0) <= 65536 && req.ends_with("\r\n\r\n") => {
             let mut body = vec![0; length.unwrap_or(0)];
             stream.read_exact(&mut body)?;
-            sync_route(db, job, method, path, authorized, &body)
+            sync_route(db, job, connect, method, path, authorized, &body)
         }
         _ => (
             "400 Bad Request",
@@ -384,11 +390,76 @@ fn respond(db: &Connection, job: &sync_job::SyncJob, mut stream: TcpStream) -> R
 fn sync_route(
     db: &Connection,
     job: &sync_job::SyncJob,
+    connect: &onboarding::Onboarding,
     method: &str,
     path: &str,
     authorized: bool,
     body: &[u8],
 ) -> (&'static str, String) {
+    if path == "/google/connect" {
+        if !authorized {
+            return (
+                "403 Forbidden",
+                serde_json::json!({"error":"Request header required"}).to_string(),
+            );
+        }
+        // Expected action rejections travel as JSON application errors. Some device
+        // network paths discard HTTP error bodies; preserve the reason for QML.
+        let rejected = |message: &str| {
+            let mut status = serde_json::to_value(connect.status()).unwrap();
+            status["error"] = serde_json::json!(message);
+            ("200 OK", status.to_string())
+        };
+        if method == "GET" {
+            return ("200 OK", serde_json::to_string(&connect.status()).unwrap());
+        }
+        if method != "POST" {
+            return ("405 Method Not Allowed", "{}".into());
+        }
+        let value: serde_json::Value = match serde_json::from_slice(body) {
+            Ok(v) => v,
+            Err(_) => return ("400 Bad Request", "{}".into()),
+        };
+        let action = value["action"].as_str().unwrap_or("");
+        if action != "cancel" && job.status().state == "running" {
+            return rejected("Wait for sync to finish before connecting Google");
+        }
+        if action == "start" && edits::count(db).unwrap_or(1) != 0 {
+            return rejected(
+                "Sync or discard pending Google edits before replacing the connection",
+            );
+        }
+        let result = match action {
+            "start" => {
+                connect.start();
+                Ok(())
+            }
+            "cancel" => {
+                connect.cancel();
+                Ok(())
+            }
+            "accept" => connect.accept(db),
+            _ => {
+                return (
+                    "400 Bad Request",
+                    serde_json::json!({"error":"Unknown connection action"}).to_string(),
+                )
+            }
+        };
+        return match result {
+            Ok(()) => ("200 OK", serde_json::to_string(&connect.status()).unwrap()),
+            Err(_) => rejected("Could not save this connection. Check pending edits and available storage, then retry."),
+        };
+    }
+    if method == "POST"
+        && matches!(path, "/google/sync" | "/google/calendars/refresh")
+        && connect.active()
+    {
+        return (
+            "409 Conflict",
+            serde_json::json!({"error":"Finish or cancel Google sign-in first"}).to_string(),
+        );
+    }
     if path == "/navigation" {
         return match method {
             "GET" => match settings::navigation(db) {
@@ -623,6 +694,7 @@ fn serve(db: Connection, socket: Option<&str>) -> Result<()> {
     let listener = TcpListener::bind("127.0.0.1:38765")?;
     let _lifecycle = socket.map(lifecycle::connect).transpose()?;
     let sync_job = sync_job::SyncJob::default();
+    let connect = onboarding::Onboarding::default();
     if settings::should_auto_sync(&db, chrono::Utc::now()).unwrap_or(false) {
         if let Err(e) = sync_job.start(&db) {
             eprintln!("Automatic sync: {e}");
@@ -632,7 +704,7 @@ fn serve(db: Connection, socket: Option<&str>) -> Result<()> {
     for conn in listener.incoming() {
         match conn {
             Ok(s) => {
-                if let Err(e) = respond(&db, &sync_job, s) {
+                if let Err(e) = respond(&db, &sync_job, &connect, s) {
                     eprintln!("request: {e}");
                 }
             }

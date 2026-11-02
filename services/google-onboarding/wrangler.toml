@@ -1,0 +1,39 @@
+name = "remarkable-calendar-onboarding"
+main = "src/worker.mjs"
+compatibility_date = "2026-10-30"
+# Serve the owned Cloudflare hostname directly; no Pages forwarding is needed.
+workers_dev = false
+preview_urls = false
+routes = [{ pattern = "auth.opendev.stream", custom_domain = true }]
+
+[observability]
+enabled = false
+
+[vars]
+PUBLIC_ORIGIN = "https://auth.opendev.stream"
+# Set to the Web application client ID from Google Cloud before deployment.
+GOOGLE_CLIENT_ID = "736112187142-vj5et7l2inap2lc2qnjkh1m9ar31l8e8.apps.googleusercontent.com"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "remarkable-calendar-onboarding"
+# Replace with the ID returned by `wrangler d1 create`.
+database_id = "dc328c70-94e5-494c-bd82-cfd3978f85dc"
+migrations_dir = "migrations"
+
+[[ratelimits]]
+name = "PAIRING_LIMIT"
+namespace_id = "1001"
+simple = { limit = 6, period = 60 }
+
+[[ratelimits]]
+name = "TOKEN_LIMIT"
+namespace_id = "1002"
+simple = { limit = 60, period = 60 }
+
+[triggers]
+crons = ["*/10 * * * *"]
+
+# Add GOOGLE_CLIENT_SECRET and TOKEN_ENCRYPTION_KEY with `wrangler secret put`.
+# TOKEN_ENCRYPTION_KEY is an unpadded base64url-encoded random 32-byte key.
+# Do not configure request-body logging or OAuth URL logging on this service.

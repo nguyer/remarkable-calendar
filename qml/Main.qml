@@ -6,7 +6,7 @@ Rectangle {
     anchors.fill: parent
     color: "white"
     signal close
-    function unloading() { cancelMonthRequest(); navigationRetry.stop(); navigationDeadline.stop(); if(navigationRequest) navigationRequest.abort(); if(changeRequest) changeRequest.abort(); changeDeadline.stop(); cancelDayRequest(); ++settingsSerial; settingsDeadline.stop(); if (settingsRequest) settingsRequest.abort(); ++generation; ++syncSerial; retry.stop(); requestDeadline.stop(); syncPoll.stop(); syncDeadline.stop(); if (activeRequest) activeRequest.abort(); if (syncRequest) syncRequest.abort(); endpoint.terminate() }
+    function unloading() { googleConnect.shutdown(); cancelMonthRequest(); navigationRetry.stop(); navigationDeadline.stop(); if(navigationRequest) navigationRequest.abort(); if(changeRequest) changeRequest.abort(); changeDeadline.stop(); cancelDayRequest(); ++settingsSerial; settingsDeadline.stop(); if (settingsRequest) settingsRequest.abort(); ++generation; ++syncSerial; retry.stop(); requestDeadline.stop(); syncPoll.stop(); syncDeadline.stop(); if (activeRequest) activeRequest.abort(); if (syncRequest) syncRequest.abort(); endpoint.terminate() }
     AppLoad { id: endpoint; applicationID: "org.remarkablecalendar.move" }
     property date selectedDate: new Date()
     property date displayedDate: new Date()
@@ -880,6 +880,8 @@ Rectangle {
     WeekView { id: weekPage; app: root; anchors.fill: parent; visible: root.primaryView === "week" }
     DayPage { id: dayPage; app: root; anchors.fill: parent; visible: root.primaryView === "day" }
     MonthView { id: monthPage; app: root; anchors.fill: parent; visible: root.primaryView === "month" }
+    function openGoogleConnect() { googleConnect.show() }
+    GoogleConnect { id: googleConnect; app: root }
     SettingsView { app: root }
     DetailsView { id: detailsPage; app: root }
     EventEditor { id: editorPage; app: root }
