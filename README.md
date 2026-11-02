@@ -148,7 +148,7 @@ If the backend reports a glibc compatibility error when launched on your tablet,
 
 Enter the tablet password when requested. The script installs the files under `/home/root/xovi/exthome/appload/remarkable-calendar` and prints a confirmation when complete.
 
-For Google sync, keep Calendar closed until you complete the initial timezone setup below. This avoids saving the default UTC timezone before you choose your own.
+For Google sync, complete the account setup below, then choose your timezone in Settings.
 
 If you only want local events, open **AppLoad** on your tablet and select **Reload**. Open **Calendar** now and skip to [Use Calendar](#use-calendar).
 
@@ -196,22 +196,9 @@ ssh root@10.11.99.1 'chmod 600 /home/root/.config/remarkable-calendar/google.jso
 
 If the helper says the output already exists, or if the browser callback fails, see [Google sign-in help](docs/google-calendar.md#authorize-your-account).
 
-### 8. Set your timezone and run the first sync
+### 8. Set your timezone
 
-Connect the tablet to Wi-Fi and keep Calendar closed. On a fresh installation, run an initial sync **before saving any settings** so the app picks up your display timezone.
-
-Choose an IANA timezone such as `America/Guatemala`, `America/New_York`, or `Europe/London`:
-
-```sh
-read -r -p 'Display timezone (for example America/Guatemala): ' calendar_timezone
-calendar_start=$(date +%Y-%m-01)
-calendar_end=$(date -d "$calendar_start +7 months" +%Y-%m-%d)
-ssh root@10.11.99.1 "/home/root/xovi/exthome/appload/remarkable-calendar/backend/entry google-sync $calendar_start $calendar_end $calendar_timezone"
-```
-
-Enter the timezone name without spaces or quotation marks. This downloads your primary calendar for an initial window starting this month. Once you save settings in the app, future syncs use its configured rolling window.
-
-If you already opened Calendar **and saved Settings**, the timezone may already be stored as UTC. Use the [existing-settings timezone instructions](docs/google-calendar.md#change-an-already-saved-timezone) instead; repeating a command-line sync does not overwrite that preference.
+Connect the tablet to Wi-Fi, open Calendar, and go to **Settings → Time zone**. Search for your city or region, select the correct timezone (for example `America/Guatemala`), and tap **Save & sync**. You can change this later using the same control. Google event times update after a successful sync.
 
 ### 9. Open Calendar and select calendars
 

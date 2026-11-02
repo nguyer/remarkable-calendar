@@ -1,5 +1,7 @@
 <RCC>
   <qresource prefix="/">
+    <file alias="qml/TimezonePicker.qml">../qml/TimezonePicker.qml</file>
+    <file alias="qml/GoogleConnect.qml">../qml/GoogleConnect.qml</file>
     <file alias="qml/MonthEventsCanvas.qml">../qml/MonthEventsCanvas.qml</file>
     <file alias="qml/MonthView.qml">../qml/MonthView.qml</file>
     <file alias="qml/CalendarToolbar.qml">../qml/CalendarToolbar.qml</file>

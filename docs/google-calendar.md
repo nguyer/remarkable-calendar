@@ -1,6 +1,6 @@
 # Google Calendar setup
 
-Google sync requires a one-time setup on your computer. After that, Calendar can refresh its credentials and sync directly from the tablet over Wi-Fi. You can browse cached events and create, edit, or delete events offline; Google changes wait for a successful sync.
+Google sync can be connected from **Settings → Connect Google** by scanning the tablet’s QR code with your phone. The desktop helper below remains available as an alternative. After that, Calendar can refresh its credentials and sync directly from the tablet over Wi-Fi. You can browse cached events and create, edit, or delete events offline; Google changes wait for a successful sync.
 
 Install Calendar first using the [README](../README.md#set-up-your-tablet). You also need Python 3 and a copy of this repository on your computer to run the authorization helper. The commands below run from the repository root in Linux or WSL and use the tablet's USB address, `10.11.99.1`.
 
@@ -45,17 +45,13 @@ If you used `google-new.json`, replace only the **computer-side** filename in th
 
 ## Choose the display timezone
 
-Calendar uses one display timezone for all calendars. On a fresh installation it defaults to UTC. The timezone is shown in Settings, but there is currently no timezone picker.
+Open **Settings**, tap the current **Time zone**, and search for a city or region using the on-screen letters. For example, search `Guatemala` and select `America/Guatemala`. The picker works offline and lists timezones supported by the tablet's built-in timezone database, including daylight-saving rules.
 
-For a **fresh installation, before saving settings**, initialize your preferred timezone with a first sync. Keep Calendar closed and connect the tablet to Wi-Fi. This example syncs the primary calendar using New York time:
+Tap a result to return to Settings, then **Save & sync** to apply it. Google event times update when the sync completes; if offline, cached times retain the previous timezone until the next successful sync. Local events keep their entered clock times. Calendar uses this display timezone for all selected Google calendars.
 
-```sh
-ssh root@10.11.99.1 '/home/root/xovi/exthome/appload/remarkable-calendar/backend/entry google-sync 2026-10-01 2027-05-01 America/New_York'
-```
+### Change an already saved timezone
 
-Replace the dates with a range around today and replace `America/New_York` with your IANA timezone, such as `America/Guatemala` or `Europe/London`. The ending date is exclusive. The app uses this initial timezone when creating its settings; subsequent in-app syncs use the rolling window selected in Settings.
-
-If you have already saved settings, a command-line sync does not overwrite their timezone. Existing configurations can be changed through the [local settings interface](development.md#local-http-interface); this is currently an advanced setup step. Do not run a command-line sync while an in-app sync is running.
+Use **Settings → Time zone** at any time, choose a new zone, and tap **Save & sync**. No database reset, terminal command, or Google reauthorization is required.
 
 ## Select calendars and sync
 
@@ -77,3 +73,20 @@ Changes save on the tablet first. Open Settings to review pending operations and
 Google projects in Testing can have expiring authorizations. If sync reports an authorization error, repeat the browser sign-in and replace the tablet credentials using the steps above. To revoke access, remove the authorization from your Google account's third-party connections. There is currently no in-app sign-in or disconnect screen.
 
 For more background, see Google's documentation on [desktop authorization](https://developers.google.com/identity/protocols/oauth2/native-app) and [refresh token expiration](https://developers.google.com/identity/protocols/oauth2#expiration). Build instructions and implementation details are in [Development](development.md).
+
+## Test tablet QR sign-in
+
+Build the backend and UI, deploy as usual, select **AppLoad → Reload**, and open Calendar with tablet Wi-Fi enabled. Existing credentials do not trigger a first-launch prompt; open **Settings → Connect Google** instead. A tablet without credentials offers connection on launch and can continue without Google.
+
+1. Tap **Connect Google** (or **Reconnect Google**), then scan the QR with your phone.
+2. Compare the six-digit codes on phone and tablet. Continue with Google, choose your account, and grant both Calendar permissions.
+3. Return to the tablet and check the account email. Tap **Use this account** to save the connection. Until that confirmation, the old credentials remain in place.
+4. The app opens Settings and refreshes the calendar list. Select calendars, then tap **Save & sync**.
+5. Confirm event times and navigation. Close/reopen Calendar and sync again to exercise access-token renewal through the service.
+6. Cancel a connection before completing sign-in, and try a denied-permissions attempt. Existing events and credentials should remain available.
+
+A confirmed replacement clears only the previous Google cache, calendar selections, and editor calendar preference, then downloads the selected calendars again. Local events, navigation, display settings, and timezone remain. Pending Google edits block replacement; sync or discard them first. If saving fails after cache reset, the previous credentials remain usable and the cache can be downloaded again. Back up `google.json` privately before testing a replacement if you want to restore the previous Desktop connection.
+
+Pairing URLs expire after ten minutes. If the final one-time service response is lost, start a new connection. Temporary service failures keep saved credentials, events, and queued edits. No service tokens or polling secrets are sent to QML. The new encrypted credential file uses the same private `google.json` location as the desktop method.
+
+If the connection screen reports that the running backend does not support sign-in, deploy both the backend and UI from the same build and use **AppLoad → Reload**, then reopen Calendar. The connection screen talks to the tablet's local `/google/connect` endpoint; an old running backend can return a non-JSON 404 response even when the new UI is visible. A cloud setup error is instead reported by the backend as a sign-in status message.

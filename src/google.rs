@@ -10,44 +10,120 @@ use std::{env, fs, os::unix::fs::PermissionsExt, path::PathBuf, time::Duration a
 
 const API: &str = "https://www.googleapis.com/calendar/v3/";
 #[derive(Deserialize)]
-struct Credentials {
-    client_id: String,
-    client_secret: String,
-    refresh_token: String,
+#[serde(untagged)]
+enum Credentials {
+    Relay {
+        #[serde(rename = "type")]
+        kind: String,
+        service_url: String,
+        grant: String,
+    },
+    Desktop {
+        client_id: String,
+        client_secret: String,
+        refresh_token: String,
+    },
 }
-fn credentials() -> Result<Credentials> {
-    let path = env::var_os("REMARKABLE_CALENDAR_GOOGLE_CREDENTIALS")
+pub(crate) fn credentials_path() -> PathBuf {
+    env::var_os("REMARKABLE_CALENDAR_GOOGLE_CREDENTIALS")
         .map(PathBuf::from)
         .unwrap_or_else(|| {
             PathBuf::from(env::var_os("HOME").unwrap_or_else(|| ".".into()))
                 .join(".config/remarkable-calendar/google.json")
-        });
-    let metadata = fs::metadata(&path).map_err(|_| "Google sign-in credentials are unavailable. Complete browser login and copy google.json to the tablet")?;
-    if metadata.permissions().mode() & 0o077 != 0 {
-        return Err("Google credentials must be private: chmod 600 <credentials file>".into());
+        })
+}
+fn credentials() -> Result<Credentials> {
+    let path = credentials_path();
+    let metadata =
+        fs::symlink_metadata(&path).map_err(|_| "Connect Google in Settings to sign in")?;
+    if !metadata.is_file() || metadata.permissions().mode() & 0o077 != 0 {
+        return Err("Google credentials must be a private regular file (mode 600)".into());
     }
-    Ok(serde_json::from_slice(&fs::read(path)?)?)
+    if metadata.len() > 32768 {
+        return Err("Invalid Google credentials file".into());
+    }
+    serde_json::from_slice(&fs::read(path)?)
+        .map_err(|_| "Invalid Google credentials; reconnect in Settings".into())
 }
 pub(crate) fn client_and_token() -> Result<(Client, String)> {
     let c = credentials()?;
     let client = Client::builder()
+        .user_agent("remarkable-calendar/0.8")
         .timeout(Timeout::from_secs(30))
         .redirect(reqwest::redirect::Policy::none())
         .build()?;
-    let response = client
-        .post("https://oauth2.googleapis.com/token")
-        .form(&[
-            ("client_id", c.client_id.as_str()),
-            ("client_secret", c.client_secret.as_str()),
-            ("refresh_token", c.refresh_token.as_str()),
-            ("grant_type", "refresh_token"),
-        ])
-        .send()?;
+    let response = match c {
+        Credentials::Desktop {
+            client_id,
+            client_secret,
+            refresh_token,
+        } => client
+            .post("https://oauth2.googleapis.com/token")
+            .form(&[
+                ("client_id", client_id.as_str()),
+                ("client_secret", client_secret.as_str()),
+                ("refresh_token", refresh_token.as_str()),
+                ("grant_type", "refresh_token"),
+            ])
+            .send()?,
+        Credentials::Relay {
+            kind,
+            service_url,
+            grant,
+        } => {
+            if kind != "google-relay-v1"
+                || service_url != crate::onboarding::ORIGIN
+                || grant.len() > 12000
+                || !grant.starts_with("v1.")
+            {
+                return Err("Unrecognized Google connection; reconnect in Settings".into());
+            }
+            return relay_client_and_token(client, &grant);
+        }
+    };
     if !response.status().is_success() {
-        return Err(format!("Google token refresh failed (HTTP {}); repeat browser login if access expired or was revoked", response.status()).into());
+        return Err(format!("Google token refresh failed (HTTP {}); reconnect Google in Settings if access expired or was revoked", response.status()).into());
     }
     let body: Value = response.json()?;
     Ok((client, required(&body, "access_token")?.to_owned()))
+}
+// Reuse short-lived relay tokens during a sync rather than renewing per calendar/event.
+fn relay_client_and_token(client: Client, grant: &str) -> Result<(Client, String)> {
+    type Cached = Option<(String, String, std::time::Instant)>;
+    static CACHE: std::sync::OnceLock<std::sync::Mutex<Cached>> = std::sync::OnceLock::new();
+    let mut cache = CACHE
+        .get_or_init(|| std::sync::Mutex::new(None))
+        .lock()
+        .unwrap();
+    if let Some((cached_grant, token, expires)) = cache.as_ref() {
+        if cached_grant == grant && *expires > std::time::Instant::now() {
+            return Ok((client, token.clone()));
+        }
+    }
+    let response = client
+        .post(format!("{}/v1/google/token", crate::onboarding::ORIGIN))
+        .json(&serde_json::json!({"grant":grant}))
+        .send()
+        .map_err(|_| "Cannot reach Google sign-in service; saved events and edits are kept")?;
+    if !response.status().is_success() {
+        *cache = None;
+        return Err(if response.status().as_u16()==401 { "Google sign-in expired. Reconnect Google in Settings." }
+            else { "Google sign-in service is unavailable. Try syncing again later; saved events and edits are kept." }.into());
+    }
+    let body: Value = response
+        .json()
+        .map_err(|_| "Invalid token response from Google sign-in service")?;
+    let token = required(&body, "access_token")?.to_owned();
+    let lifetime = body["expires_in"]
+        .as_u64()
+        .filter(|n| *n > 0 && *n <= 86400)
+        .ok_or("Invalid Google token expiration")?;
+    *cache = Some((
+        grant.into(),
+        token.clone(),
+        std::time::Instant::now() + Timeout::from_secs(lifetime.saturating_sub(60)),
+    ));
+    Ok((client, token))
 }
 fn required<'a>(v: &'a Value, field: &str) -> Result<&'a str> {
     v.get(field)

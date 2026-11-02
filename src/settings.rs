@@ -281,6 +281,13 @@ mod tests {
         );
         let db = crate::database(std::path::Path::new(":memory:"))?;
         save(&db, &s)?;
+        s.timezone = "America/Guatemala".into();
+        save(&db, &s)?;
+        assert_eq!(read(&db)?.timezone, "America/Guatemala");
+        s.timezone = "not/a_timezone".into();
+        assert!(save(&db, &s).is_err());
+        assert_eq!(read(&db)?.timezone, "America/Guatemala");
+        s.timezone = "America/Guatemala".into();
         s.time_format = "24h".into();
         s.day_scroll = true;
         save(&db, &s)?;

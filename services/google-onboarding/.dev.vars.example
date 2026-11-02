@@ -1,0 +1,3 @@
+# Copy to .dev.vars (ignored by git). Use a separate Google client for local testing.
+GOOGLE_CLIENT_SECRET="replace-with-web-client-secret"
+TOKEN_ENCRYPTION_KEY="replace-with-base64url-encoded-random-32-byte-key"

@@ -207,3 +207,7 @@ The temporary performance readout has been removed from Settings. Timing message
 ## Automated releases
 
 See [Releases and Vellum packaging](packaging.md) for the GitHub Actions workflow, signing-key setup, version tags, local package builds, and tablet validation. The workflow builds the backend and QML from source, produces a signed ARM64 Vellum package and app bundle, and creates a draft release for version tags. It does not submit to the Vellum catalog automatically.
+
+## Google phone onboarding service
+
+`services/google-onboarding/` contains the Cloudflare Worker, D1 schema, phone pages, pairing/token-renewal protocol, and tests for future QR onboarding. See its [service guide](../services/google-onboarding/README.md). The tablet now uses `src/onboarding.rs` and `qml/GoogleConnect.qml` for background pairing, a QR display, and explicit account confirmation. Relay credentials use the trusted configured service origin; Desktop OAuth credentials continue to refresh directly with Google. The `/google/connect` API requires the native mutation header even for status reads, and never exposes credential grants or polling secrets. See the Google guide for device testing.

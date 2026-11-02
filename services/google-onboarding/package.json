@@ -1,0 +1,20 @@
+{
+  "name": "remarkable-calendar-google-onboarding",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "wrangler dev --var PUBLIC_ORIGIN:http://localhost:8787",
+    "test": "node --test test/*.test.mjs",
+    "check": "wrangler deploy --dry-run",
+    "deploy": "wrangler deploy",
+    "diagnose": "python3 scripts/check-config.py",
+    "predeploy": "python3 scripts/check-config.py"
+  },
+  "devDependencies": {
+    "wrangler": "4.156.0"
+  }
+}
